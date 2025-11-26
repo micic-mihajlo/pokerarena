@@ -28,10 +28,7 @@ Your goal is to maximize your chip winnings over many hands. Consider:
 - Stack sizes
 
 RESPONSE FORMAT:
-You must respond with ONLY valid JSON in this exact format:
-{"action": "fold" | "check" | "call" | "bet" | "raise", "reasoning": "brief explanation"}
-
-Do not include any other text outside the JSON.`;
+{"action": "ACTION"} where ACTION is: fold, check, call, bet, raise`;
 
 export function formatGameStatePrompt(state: GameState, player: Player, validActions: ValidActions): string {
   const holeCards = player.holeCards.map(formatCard).join(", ");
@@ -81,6 +78,6 @@ RECENT ACTIONS:
 
 AVAILABLE ACTIONS: ${availableActions.join(", ")}
 
-What is your action? Respond with JSON only.`;
+Your action?`;
 }
 

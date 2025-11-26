@@ -1,11 +1,12 @@
 "use client";
 
-import { Player, PlayerAction } from "@/types/poker";
+import { Player, PlayerAction, Card, HAND_RANK_NAMES, EvaluatedHand } from "@/types/poker";
 import { PlayingCard } from "./card";
 import { ChipStack } from "./chip-stack";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
-import { Badge } from "@/components/ui/badge";
+import { useMemo } from "react";
+import { evaluateBestHand } from "@/lib/poker/hand-evaluator";
 
 interface PlayerSeatProps {
   player: Player;
@@ -13,50 +14,84 @@ interface PlayerSeatProps {
   showCards?: boolean;
   lastAction?: PlayerAction;
   isShowdown?: boolean;
+  communityCards?: Card[];
 }
 
-const positionClasses: Record<string, string> = {
-  "top": "top-0 left-1/2 -translate-x-1/2",
-  "bottom": "bottom-0 left-1/2 -translate-x-1/2",
-  "left": "left-0 top-1/2 -translate-y-1/2",
-  "right": "right-0 top-1/2 -translate-y-1/2",
-  "top-left": "top-4 left-4",
-  "top-right": "top-4 right-4",
-  "bottom-left": "bottom-4 left-4",
-  "bottom-right": "bottom-4 right-4",
+const positionStyles: Record<string, { container: React.CSSProperties; chip: React.CSSProperties }> = {
+  "top": {
+    container: { top: "2%", left: "50%", transform: "translateX(-50%)" },
+    chip: { bottom: "-24px", left: "50%", transform: "translateX(-50%)" },
+  },
+  "bottom": {
+    container: { bottom: "2%", left: "50%", transform: "translateX(-50%)" },
+    chip: { top: "-24px", left: "50%", transform: "translateX(-50%)" },
+  },
+  "left": {
+    container: { left: "2%", top: "50%", transform: "translateY(-50%)" },
+    chip: { right: "-35px", top: "50%", transform: "translateY(-50%)" },
+  },
+  "right": {
+    container: { right: "2%", top: "50%", transform: "translateY(-50%)" },
+    chip: { left: "-35px", top: "50%", transform: "translateY(-50%)" },
+  },
+  "top-left": {
+    container: { top: "12%", left: "8%" },
+    chip: { bottom: "-24px", right: "-20px" },
+  },
+  "top-right": {
+    container: { top: "12%", right: "8%" },
+    chip: { bottom: "-24px", left: "-20px" },
+  },
+  "bottom-left": {
+    container: { bottom: "12%", left: "8%" },
+    chip: { top: "-24px", right: "-20px" },
+  },
+  "bottom-right": {
+    container: { bottom: "12%", right: "8%" },
+    chip: { top: "-24px", left: "-20px" },
+  },
 };
 
-export function PlayerSeat({ player, position, showCards = false, lastAction, isShowdown }: PlayerSeatProps) {
+export function PlayerSeat({ 
+  player, 
+  position, 
+  showCards = false, 
+  lastAction, 
+  isShowdown,
+  communityCards = []
+}: PlayerSeatProps) {
   const isFolded = player.status === "folded";
   const isAllIn = player.status === "all_in";
   const isOut = player.status === "out";
   const isActive = player.isTurn;
 
+  const bestHand = useMemo((): EvaluatedHand | null => {
+    if (!isActive || player.holeCards.length < 2) return null;
+    const allCards = [...player.holeCards, ...communityCards];
+    if (allCards.length < 5) return null;
+    try {
+      return evaluateBestHand(player.holeCards, communityCards);
+    } catch {
+      return null;
+    }
+  }, [isActive, player.holeCards, communityCards]);
+
+  const styles = positionStyles[position];
+
   return (
     <motion.div
-      className={cn(
-        "absolute flex flex-col items-center gap-2",
-        positionClasses[position]
-      )}
-      initial={{ opacity: 0, scale: 0.8 }}
+      className="absolute flex flex-col items-center"
+      style={styles.container}
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
     >
       {/* cards */}
       <motion.div
         className={cn(
-          "flex gap-1 rounded-lg p-1",
-          isFolded && "opacity-50",
-          isActive && "ring-2 ring-amber-400"
+          "flex gap-0.5 mb-1 p-0.5 rounded",
+          isFolded && "opacity-40",
+          isActive && "ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
         )}
-        animate={isActive ? {
-          boxShadow: [
-            "0 0 15px rgba(251,191,36,0.3)",
-            "0 0 25px rgba(251,191,36,0.5)",
-            "0 0 15px rgba(251,191,36,0.3)"
-          ]
-        } : {}}
-        transition={isActive ? { duration: 1.5, repeat: Infinity } : {}}
       >
         {player.holeCards.length > 0 ? (
           player.holeCards.map((card, i) => (
@@ -64,174 +99,107 @@ export function PlayerSeat({ player, position, showCards = false, lastAction, is
               key={i}
               card={card}
               faceDown={!showCards && !isShowdown}
-              size="md"
-              delay={i * 0.1}
+              size="sm"
             />
           ))
         ) : (
-          <div className="w-12 h-17" />
+          <div className="w-[72px] h-14" />
         )}
       </motion.div>
 
-      {/* current bet chip */}
+      {/* player info */}
+      <div
+        className={cn(
+          "relative flex flex-col items-center px-3 py-1.5 rounded-lg min-w-[100px]",
+          "bg-slate-800/90 backdrop-blur-sm border",
+          isActive && "border-amber-400",
+          isFolded && "opacity-50 border-slate-700",
+          isOut && "opacity-30 border-slate-700",
+          isAllIn && "border-rose-500",
+          !isActive && !isFolded && !isOut && !isAllIn && "border-slate-700"
+        )}
+      >
+        {/* dealer button */}
+        {player.isDealer && (
+          <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white text-slate-900 text-[10px] font-bold flex items-center justify-center shadow">
+            D
+          </div>
+        )}
+
+        {/* name */}
+        <div className="text-white text-xs font-medium truncate max-w-[90px]">
+          {player.name}
+        </div>
+
+        {/* chips */}
+        <div className="text-emerald-400 font-mono text-xs font-bold">
+          {player.chips.toLocaleString()}
+        </div>
+
+        {/* best hand for active player */}
+        {isActive && bestHand && (
+          <div className="text-amber-400 text-[9px] mt-0.5">
+            {HAND_RANK_NAMES[bestHand.rank]}
+          </div>
+        )}
+
+        {/* status */}
+        {isAllIn && (
+          <div className="text-rose-400 text-[9px] font-bold mt-0.5">ALL IN</div>
+        )}
+        {isFolded && (
+          <div className="text-slate-500 text-[9px] mt-0.5">FOLDED</div>
+        )}
+
+        {/* thinking indicator */}
+        {isActive && (
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-1 h-1 rounded-full bg-amber-400"
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* bet chip */}
       {player.currentBet > 0 && (
         <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="absolute -bottom-8"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute"
+          style={styles.chip}
         >
           <ChipStack amount={player.currentBet} size="sm" />
         </motion.div>
       )}
 
-      {/* player info card */}
-      <div
-        className={cn(
-          "relative flex flex-col items-center px-4 py-2.5 rounded-xl",
-          "bg-slate-800 border shadow-lg min-w-[130px]",
-          isActive && "border-amber-400 ring-2 ring-amber-400/30",
-          isFolded && "opacity-60 border-slate-700",
-          isOut && "opacity-40 border-slate-700",
-          isAllIn && "border-rose-500",
-          !isActive && !isFolded && !isOut && !isAllIn && "border-slate-600"
-        )}
-      >
-        {/* dealer button */}
-        {player.isDealer && (
-          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white text-slate-900 text-xs font-bold flex items-center justify-center border border-slate-300 shadow">
-            D
-          </div>
-        )}
-
-        {/* model badge */}
-        <Badge variant="secondary" className="text-[10px] mb-1 bg-slate-700 text-slate-300 border-0">
-          {getModelShortName(player.model)}
-        </Badge>
-
-        {/* player name */}
-        <div className="text-white font-semibold text-sm truncate max-w-[110px]">
-          {player.name}
-        </div>
-
-        {/* chips */}
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="text-emerald-400 font-mono text-sm font-bold">
-            {player.chips.toLocaleString()}
-          </span>
-        </div>
-
-        {/* status badges */}
-        <AnimatePresence>
-          {isAllIn && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-            >
-              <Badge className="mt-1.5 text-[10px] bg-rose-600 text-white border-0">
-                ALL IN
-              </Badge>
-            </motion.div>
-          )}
-          {isFolded && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-            >
-              <Badge variant="secondary" className="mt-1.5 text-[10px] bg-slate-700 text-slate-400">
-                FOLDED
-              </Badge>
-            </motion.div>
-          )}
-          {isOut && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-            >
-              <Badge variant="secondary" className="mt-1.5 text-[10px] bg-slate-700 text-slate-500">
-                OUT
-              </Badge>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* thinking indicator with timer bar */}
-        {isActive && (
-          <>
-            <motion.div
-              className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-1"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              {[0, 1, 2].map((i) => (
-                <motion.div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-amber-400"
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{
-                    duration: 0.6,
-                    repeat: Infinity,
-                    delay: i * 0.15,
-                  }}
-                />
-              ))}
-            </motion.div>
-            {/* timer bar */}
-            <div className="absolute -bottom-3 left-0 right-0 h-0.5 bg-slate-700 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-amber-400"
-                initial={{ width: "100%" }}
-                animate={{ width: "0%" }}
-                transition={{ duration: 15, ease: "linear" }}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* last action bubble */}
+      {/* last action */}
       <AnimatePresence>
         {lastAction && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.8 }}
-            className="absolute -top-10"
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute -top-6 left-1/2 -translate-x-1/2"
           >
-            <Badge className={cn("text-xs font-bold uppercase shadow", getActionStyle(lastAction.type))}>
-              {lastAction.type}
-              {lastAction.amount ? ` ${lastAction.amount}` : ""}
-            </Badge>
+            <div className={cn(
+              "text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow",
+              lastAction.type === "fold" && "bg-slate-600 text-slate-200",
+              lastAction.type === "check" && "bg-slate-500 text-white",
+              lastAction.type === "call" && "bg-emerald-600 text-white",
+              lastAction.type === "bet" && "bg-amber-600 text-white",
+              lastAction.type === "raise" && "bg-rose-600 text-white"
+            )}>
+              {lastAction.type}{lastAction.amount ? ` ${lastAction.amount}` : ""}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
   );
-}
-
-function getModelShortName(model: string): string {
-  if (model.includes("gpt")) return "GPT";
-  if (model.includes("claude-haiku")) return "Haiku";
-  if (model.includes("claude-sonnet")) return "Sonnet";
-  if (model.includes("gemini")) return "Gemini";
-  return model.split("/").pop() || model;
-}
-
-function getActionStyle(action: string): string {
-  switch (action) {
-    case "fold":
-      return "bg-slate-600 text-slate-200";
-    case "check":
-      return "bg-slate-500 text-white";
-    case "call":
-      return "bg-emerald-600 text-white";
-    case "bet":
-      return "bg-amber-600 text-white";
-    case "raise":
-      return "bg-rose-600 text-white";
-    default:
-      return "bg-slate-600 text-white";
-  }
 }

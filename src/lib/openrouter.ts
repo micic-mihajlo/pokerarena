@@ -1,9 +1,18 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
 // create openrouter client
-export const openrouter = createOpenRouter({
+const openrouterClient = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY || "",
 });
+
+// wrapper that enables reasoning for all models
+export function openrouter(modelId: string) {
+  return openrouterClient(modelId, {
+    extraBody: {
+      include_reasoning: true,
+    },
+  });
+}
 
 // available models for the benchmark
 export const AVAILABLE_MODELS = [

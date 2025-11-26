@@ -10,53 +10,40 @@ interface CardProps {
   faceDown?: boolean;
   size?: "sm" | "md" | "lg";
   className?: string;
-  delay?: number;
 }
 
-const sizeClasses = {
-  sm: "w-10 h-14",
-  md: "w-12 h-17",
-  lg: "w-16 h-22",
+const sizes = {
+  sm: { card: "w-9 h-14", text: "text-sm" },
+  md: { card: "w-12 h-[68px]", text: "text-base" },
+  lg: { card: "w-16 h-[88px]", text: "text-xl" },
 };
 
-const fontSizes = {
-  sm: "text-base",
-  md: "text-lg",
-  lg: "text-2xl",
-};
-
-export function PlayingCard({ card, faceDown = false, size = "md", className, delay = 0 }: CardProps) {
+export function PlayingCard({ card, faceDown = false, size = "md", className }: CardProps) {
   const showBack = faceDown || !card;
+  const s = sizes[size];
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.2, delay }}
       className={cn(
-        "relative rounded-md shadow-md flex items-center justify-center",
-        sizeClasses[size],
-        showBack ? "bg-slate-700" : "bg-white",
+        "relative rounded shadow-md flex items-center justify-center",
+        s.card,
+        showBack ? "bg-slate-700 border border-slate-600" : "bg-white",
         className
       )}
     >
       {showBack ? (
-        <div className="text-slate-500 text-lg font-bold">♠</div>
+        <span className="text-slate-500 text-base">♠</span>
       ) : (
-        <CardFace card={card!} size={size} />
+        <span className={cn(
+          "font-bold",
+          s.text,
+          getSuitColor(card!.suit) === "red" ? "text-red-600" : "text-slate-900"
+        )}>
+          {card!.rank}{getSuitSymbol(card!.suit)}
+        </span>
       )}
     </motion.div>
-  );
-}
-
-function CardFace({ card, size }: { card: CardType; size: "sm" | "md" | "lg" }) {
-  const symbol = getSuitSymbol(card.suit);
-  const color = getSuitColor(card.suit);
-  const textColor = color === "red" ? "text-red-600" : "text-slate-900";
-
-  return (
-    <div className={cn("font-bold", fontSizes[size], textColor)}>
-      {card.rank}{symbol}
-    </div>
   );
 }
