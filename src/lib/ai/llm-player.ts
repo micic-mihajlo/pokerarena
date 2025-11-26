@@ -102,7 +102,12 @@ export async function getLLMAction(
   player: Player
 ): Promise<LLMActionResult> {
   const validActions = getValidActions(state);
-  const prompt = formatGameStatePrompt(state, player, validActions);
+  let prompt = formatGameStatePrompt(state, player, validActions);
+  
+  // gemini doesn't respect include_reasoning, so ask explicitly
+  if (player.model.includes("gemini")) {
+    prompt += "\n\nFirst briefly explain your reasoning, then give your action as JSON.";
+  }
 
   try {
     const result = await generateText({
@@ -114,12 +119,6 @@ export async function getLLMAction(
     });
 
     const { text, reasoning } = result;
-    
-    // debug for gemini
-    if (player.model.includes("gemini")) {
-      console.log(`[${player.name}] Text:`, text);
-      console.log(`[${player.name}] SDK Reasoning:`, JSON.stringify(reasoning));
-    }
     
     // parse action and inline reasoning from text
     const parsed = parseResponse(text, validActions);

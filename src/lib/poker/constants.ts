@@ -1,8 +1,8 @@
 // poker game constants
 
 export const DEFAULT_STARTING_CHIPS = 1000;
-export const DEFAULT_SMALL_BLIND = 5;
-export const DEFAULT_BIG_BLIND = 10;
+export const DEFAULT_SMALL_BLIND = 25;
+export const DEFAULT_BIG_BLIND = 50;
 
 // number of hole cards per player
 export const HOLE_CARDS_COUNT = 2;
