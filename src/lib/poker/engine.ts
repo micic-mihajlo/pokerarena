@@ -132,12 +132,22 @@ export function startHand(state: GameState): GameState {
   return newState;
 }
 
-// get position after big blind (under the gun)
+// get position after big blind (under the gun) - skips eliminated and all-in players
 function getUTGPosition(state: GameState): number {
   const numPlayers = state.players.length;
-  const sbPos = (state.dealerPosition + 1) % numPlayers;
-  const bbPos = (state.dealerPosition + 2) % numPlayers;
-  return (bbPos + 1) % numPlayers;
+  const activePlayers = state.players.filter((p) => p.status === "active");
+
+  // heads-up: SB (dealer) acts first preflop
+  if (activePlayers.length === 2) {
+    return findNextActivePlayerFrom(state, state.dealerPosition);
+  }
+
+  // find SB and BB positions (skipping eliminated players)
+  const sbPos = findNextActivePlayerFrom(state, (state.dealerPosition + 1) % numPlayers);
+  const bbPos = findNextActivePlayerFrom(state, (sbPos + 1) % numPlayers);
+
+  // UTG is first active player after BB
+  return findNextActivePlayerFrom(state, (bbPos + 1) % numPlayers);
 }
 
 // get first position after dealer for post-flop
@@ -157,13 +167,63 @@ function getFirstPostFlopPosition(state: GameState): number {
   return state.dealerPosition;
 }
 
+// find next active player starting from position (inclusive)
+function findNextActivePlayerFrom(state: GameState, startPos: number): number {
+  const numPlayers = state.players.length;
+  for (let i = 0; i < numPlayers; i++) {
+    const pos = (startPos + i) % numPlayers;
+    if (state.players[pos].status === "active") {
+      return pos;
+    }
+  }
+  return -1;
+}
+
 // post small and big blinds
 function postBlinds(state: GameState): GameState {
   const newState = { ...state };
   const numPlayers = newState.players.length;
+  const activePlayers = newState.players.filter((p) => p.status === "active");
 
-  // small blind position
-  const sbPos = (newState.dealerPosition + 1) % numPlayers;
+  // heads-up special case: dealer posts SB
+  if (activePlayers.length === 2) {
+    const sbPos = findNextActivePlayerFrom(newState, newState.dealerPosition);
+    const bbPos = findNextActivePlayerFrom(newState, (sbPos + 1) % numPlayers);
+
+    const sbPlayer = newState.players[sbPos];
+    const sbAmount = Math.min(newState.smallBlind, sbPlayer.chips);
+    sbPlayer.chips -= sbAmount;
+    sbPlayer.currentBet = sbAmount;
+    newState.pots[0].amount += sbAmount;
+
+    newState.actionLog.push({
+      type: "bet",
+      amount: sbAmount,
+      playerId: sbPlayer.id,
+      timestamp: Date.now(),
+    });
+
+    const bbPlayer = newState.players[bbPos];
+    const bbAmount = Math.min(newState.bigBlind, bbPlayer.chips);
+    bbPlayer.chips -= bbAmount;
+    bbPlayer.currentBet = bbAmount;
+    newState.pots[0].amount += bbAmount;
+
+    newState.actionLog.push({
+      type: "bet",
+      amount: bbAmount,
+      playerId: bbPlayer.id,
+      timestamp: Date.now(),
+    });
+
+    if (sbPlayer.chips === 0 && sbAmount > 0) sbPlayer.status = "all_in";
+    if (bbPlayer.chips === 0 && bbAmount > 0) bbPlayer.status = "all_in";
+
+    return newState;
+  }
+
+  // normal case: find first active player after dealer for SB
+  const sbPos = findNextActivePlayerFrom(newState, (newState.dealerPosition + 1) % numPlayers);
   const sbPlayer = newState.players[sbPos];
   const sbAmount = Math.min(newState.smallBlind, sbPlayer.chips);
   sbPlayer.chips -= sbAmount;
@@ -177,8 +237,8 @@ function postBlinds(state: GameState): GameState {
     timestamp: Date.now(),
   });
 
-  // big blind position
-  const bbPos = (newState.dealerPosition + 2) % numPlayers;
+  // find first active player after SB for BB
+  const bbPos = findNextActivePlayerFrom(newState, (sbPos + 1) % numPlayers);
   const bbPlayer = newState.players[bbPos];
   const bbAmount = Math.min(newState.bigBlind, bbPlayer.chips);
   bbPlayer.chips -= bbAmount;
@@ -192,8 +252,9 @@ function postBlinds(state: GameState): GameState {
     timestamp: Date.now(),
   });
 
-  if (sbPlayer.chips === 0) sbPlayer.status = "all_in";
-  if (bbPlayer.chips === 0) bbPlayer.status = "all_in";
+  // only set to all_in if player actually posted chips and ran out
+  if (sbPlayer.chips === 0 && sbAmount > 0) sbPlayer.status = "all_in";
+  if (bbPlayer.chips === 0 && bbAmount > 0) bbPlayer.status = "all_in";
 
   return newState;
 }

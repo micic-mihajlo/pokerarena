@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { SPEED_OPTIONS } from "@/lib/poker/constants";
 import { cn } from "@/lib/utils";
 import { Play, Pause, RotateCcw, FastForward } from "lucide-react";
+import { SettingsDialog } from "./settings-dialog";
 
 interface GameControlsProps {
   className?: string;
@@ -68,6 +69,8 @@ export function GameControls({ className, onReset }: GameControlsProps) {
             <RotateCcw className="w-4 h-4" />
             Reset
           </Button>
+
+          <SettingsDialog />
         </div>
 
         {/* game status */}

@@ -209,9 +209,9 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 p-4 md:p-6">
+    <main className="h-screen bg-slate-950 p-4 md:p-6 flex flex-col overflow-hidden">
       {/* header */}
-      <div className="max-w-[1800px] mx-auto mb-4">
+      <div className="max-w-[1800px] w-full mx-auto mb-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
@@ -233,17 +233,17 @@ export default function Home() {
       </div>
 
       {/* main content */}
-      <div className="max-w-[1800px] mx-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      <div className="max-w-[1800px] w-full mx-auto flex-1 min-h-0">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 h-full">
           {/* left panel - AI reasoning */}
-          <div className="xl:col-span-3 order-2 xl:order-1">
-            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
-              <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+          <div className="xl:col-span-3 order-2 xl:order-1 flex flex-col min-h-0">
+            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
                 <span className="text-white font-medium text-sm">AI Reasoning</span>
                 <span className="text-slate-500 text-xs">Hand #{gameState.handNumber}</span>
               </div>
 
-              <ScrollArea className="h-[500px] xl:h-[550px]" ref={reasoningScrollRef}>
+              <ScrollArea className="flex-1 min-h-0" ref={reasoningScrollRef}>
                 <div className="p-3 space-y-2">
                   {reasoningHistory.map((entry) => (
                     <motion.div
@@ -309,25 +309,26 @@ export default function Home() {
           </div>
 
           {/* center - poker table */}
-          <div className="xl:col-span-6 order-1 xl:order-2">
-            <PokerTable gameState={gameState} />
-            <p className="text-center text-slate-600 text-xs mt-2">
+          <div className="xl:col-span-6 order-1 xl:order-2 flex flex-col min-h-0">
+            <PokerTable gameState={gameState} className="flex-1" />
+            <p className="text-center text-slate-600 text-xs mt-1 flex-shrink-0">
               Spectator view — LLMs only see their own cards
             </p>
           </div>
 
           {/* right panel */}
-          <div className="xl:col-span-3 order-3 space-y-4">
+          <div className="xl:col-span-3 order-3 flex flex-col gap-3 min-h-0">
             <ActionLog
               actions={gameState.actionLog}
               players={gameState.players}
               phase={gameState.phase}
               handNumber={gameState.handNumber}
               winners={gameState.winners}
+              className="flex-1 min-h-0"
             />
 
             {/* standings */}
-            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex-shrink-0">
               <div className="px-4 py-2 border-b border-slate-800">
                 <span className="text-white font-medium text-sm">Standings</span>
               </div>
@@ -363,7 +364,7 @@ export default function Home() {
       </div>
 
       {/* game controls - fixed at bottom */}
-      <div className="max-w-[1800px] mx-auto mt-4">
+      <div className="max-w-[1800px] w-full mx-auto mt-auto pt-3 flex-shrink-0">
         <GameControls onReset={handleReset} />
       </div>
     </main>

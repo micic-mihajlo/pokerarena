@@ -40,8 +40,8 @@ export function ActionLog({ actions, players, phase, handNumber, winners, classN
   }, [actions, winners]);
 
   return (
-    <div className={cn("bg-slate-900 rounded-lg border border-slate-800 overflow-hidden", className)}>
-      <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+    <div className={cn("bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col", className)}>
+      <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
         <span className="text-white font-medium text-sm">Action Log</span>
         <div className="flex items-center gap-2">
           <span className="text-slate-500 text-xs">#{handNumber}</span>
@@ -49,7 +49,7 @@ export function ActionLog({ actions, players, phase, handNumber, winners, classN
         </div>
       </div>
 
-      <ScrollArea className="h-[220px]" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-2 space-y-0.5">
           {actions.map((action, i) => (
             <motion.div

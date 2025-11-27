@@ -130,6 +130,9 @@ export function applyAction(
   const player = newState.players[playerIndex];
   const betSize = getBetSize(newState.phase, newState.bigBlind);
 
+  // calculate amounts BEFORE modifying state (for action log)
+  let logAmount: number | undefined;
+
   switch (action) {
     case "fold":
       player.status = "folded";
@@ -144,6 +147,7 @@ export function applyAction(
         newState.bettingRound.currentBet - player.currentBet,
         player.chips
       );
+      logAmount = callAmount;
       player.chips -= callAmount;
       player.currentBet += callAmount;
       newState.pots[0].amount += callAmount;
@@ -156,6 +160,7 @@ export function applyAction(
 
     case "bet": {
       const betAmount = Math.min(betSize, player.chips);
+      logAmount = betAmount;
       player.chips -= betAmount;
       player.currentBet += betAmount;
       newState.bettingRound.currentBet = player.currentBet;
@@ -172,6 +177,7 @@ export function applyAction(
     case "raise": {
       const callAmount = newState.bettingRound.currentBet - player.currentBet;
       const totalAmount = Math.min(callAmount + betSize, player.chips);
+      logAmount = totalAmount;
       player.chips -= totalAmount;
       player.currentBet += totalAmount;
       newState.bettingRound.currentBet = player.currentBet;
@@ -186,17 +192,10 @@ export function applyAction(
     }
   }
 
-  // record action
+  // record action with pre-calculated amount
   newState.actionLog.push({
     type: action,
-    amount:
-      action === "bet"
-        ? betSize
-        : action === "raise"
-        ? betSize
-        : action === "call"
-        ? newState.bettingRound.currentBet - player.currentBet
-        : undefined,
+    amount: logAmount,
     playerId,
     timestamp: Date.now(),
     reasoning,

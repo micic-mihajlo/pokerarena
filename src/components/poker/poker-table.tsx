@@ -31,7 +31,7 @@ export function PokerTable({ gameState, className }: PokerTableProps) {
   };
 
   return (
-    <div className={cn("relative w-full aspect-[16/9] min-h-[500px] xl:min-h-[550px]", className)}>
+    <div className={cn("relative w-full h-full min-h-[400px]", className)}>
       {/* table */}
       <div className="absolute inset-0 flex items-center justify-center">
         <motion.div
