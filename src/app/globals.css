@@ -76,6 +76,21 @@
   --sidebar-accent-foreground: oklch(0.9 0 0);
   --sidebar-border: oklch(0.22 0 0);
   --sidebar-ring: oklch(0.7 0.15 160);
+
+  /* Broadcast theme colors */
+  --broadcast-bg-primary: oklch(0.08 0.01 260);
+  --broadcast-bg-secondary: oklch(0.12 0.015 260);
+  --broadcast-accent-gold: oklch(0.75 0.15 80);
+  --broadcast-accent-red: oklch(0.55 0.22 25);
+  --broadcast-accent-blue: oklch(0.60 0.15 250);
+  --broadcast-table-felt: oklch(0.25 0.08 160);
+  --broadcast-table-rail: oklch(0.30 0.05 50);
+
+  /* Glow effects */
+  --glow-gold: 0 0 20px oklch(0.75 0.15 80 / 0.5);
+  --glow-active: 0 0 30px oklch(0.60 0.15 250 / 0.6);
+  --glow-winner: 0 0 40px oklch(0.75 0.15 80 / 0.8);
+  --glow-emerald: 0 0 60px oklch(0.5 0.15 160 / 0.3);
 }
 
 .dark,
@@ -108,4 +123,59 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* Broadcast utility classes */
+.bg-gradient-radial {
+  background: radial-gradient(ellipse at center, var(--tw-gradient-stops));
+}
+
+.bg-gradient-radial-t {
+  background: radial-gradient(ellipse at top, var(--tw-gradient-stops));
+}
+
+/* Typography scale for broadcast aesthetic */
+.text-broadcast-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.text-broadcast-subtitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.text-broadcast-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.text-broadcast-stat {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-geist-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glow animations */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes sweep-gradient {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-sweep {
+  animation: sweep-gradient 3s linear infinite;
+  background-size: 200% 100%;
 }

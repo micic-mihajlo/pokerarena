@@ -5,6 +5,7 @@ import { PlayerAction, Player, GamePhase, HAND_RANK_NAMES, EvaluatedHand } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
+import { actionLogEntryVariants } from "@/lib/animations";
 
 interface ActionLogProps {
   actions: PlayerAction[];
@@ -15,22 +16,37 @@ interface ActionLogProps {
   className?: string;
 }
 
+// Action icons using unicode symbols
+const ACTION_ICONS: Record<string, string> = {
+  fold: "×",
+  check: "✓",
+  call: "→",
+  bet: "$",
+  raise: "↑",
+};
+
+const getActionStyles = (action: string) => {
+  switch (action) {
+    case "fold":
+      return { icon: "bg-slate-700", text: "text-slate-400" };
+    case "check":
+      return { icon: "bg-slate-600", text: "text-slate-300" };
+    case "call":
+      return { icon: "bg-emerald-600", text: "text-emerald-400" };
+    case "bet":
+      return { icon: "bg-amber-600", text: "text-amber-400" };
+    case "raise":
+      return { icon: "bg-rose-600", text: "text-rose-400" };
+    default:
+      return { icon: "bg-slate-600", text: "text-white" };
+  }
+};
+
 export function ActionLog({ actions, players, phase, handNumber, winners, className }: ActionLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const getPlayerName = (playerId: string) =>
     players.find((p) => p.id === playerId)?.name || "Unknown";
-
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case "fold": return "text-slate-400";
-      case "check": return "text-slate-300";
-      case "call": return "text-emerald-400";
-      case "bet": return "text-amber-400";
-      case "raise": return "text-rose-400";
-      default: return "text-white";
-    }
-  };
 
   // auto-scroll
   useEffect(() => {
@@ -40,72 +56,109 @@ export function ActionLog({ actions, players, phase, handNumber, winners, classN
   }, [actions, winners]);
 
   return (
-    <div className={cn("bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col", className)}>
-      <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-        <span className="text-white font-medium text-sm">Action Log</span>
+    <div className={cn(
+      "bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex flex-col shadow-xl",
+      className
+    )}>
+      <div className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-slate-500 text-xs">#{handNumber}</span>
-          <span className="text-slate-600 text-xs uppercase">{phase}</span>
+          <div className="w-2 h-2 rounded-full bg-rose-500" />
+          <span className="text-white font-semibold text-sm">Action Log</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 text-xs font-mono">#{handNumber}</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] uppercase font-medium">
+            {phase}
+          </span>
         </div>
       </div>
 
       <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
-        <div className="p-2 space-y-0.5">
-          {actions.map((action, i) => (
-            <motion.div
-              key={`${action.playerId}-${action.timestamp}-${i}`}
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800/30 text-sm"
-            >
-              <span className="text-slate-500 text-xs font-mono w-14 shrink-0">
-                {new Date(action.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </span>
-              <span className="text-slate-300 truncate">
-                {getPlayerName(action.playerId)}
-              </span>
-              <span className={cn("font-semibold uppercase", getActionColor(action.type))}>
-                {action.type}
-              </span>
-              {action.amount && (
-                <span className="text-emerald-400 font-mono">
-                  {action.amount}
-                </span>
-              )}
-            </motion.div>
-          ))}
+        <div className="p-2 space-y-1">
+          {actions.map((action, i) => {
+            const styles = getActionStyles(action.type);
+            return (
+              <motion.div
+                key={`${action.playerId}-${action.timestamp}-${i}`}
+                variants={actionLogEntryVariants}
+                initial="hidden"
+                animate="visible"
+                className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-slate-800/40 transition-colors group"
+              >
+                {/* Action icon */}
+                <div className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold",
+                  styles.icon
+                )}>
+                  {ACTION_ICONS[action.type] || "?"}
+                </div>
 
-          {/* winner display */}
-          {winners && winners.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mt-2 mx-2 p-3 bg-amber-500/10 rounded border border-amber-500/20"
-            >
-              <div className="text-amber-400 font-semibold text-sm text-center mb-1">
-                Winner{winners.length > 1 ? "s" : ""}
-              </div>
-              {winners.map((winner) => (
-                <div key={winner.playerId} className="text-center text-sm">
-                  <span className="text-white">{getPlayerName(winner.playerId)}</span>
-                  <span className="text-emerald-400 font-mono ml-2">+{winner.amount}</span>
-                  {winner.hand && (
-                    <span className="text-amber-300 text-xs ml-1">
-                      ({HAND_RANK_NAMES[winner.hand.rank]})
+                {/* Player and action */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium truncate">
+                      {getPlayerName(action.playerId)}
+                    </span>
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase",
+                      styles.text
+                    )}>
+                      {action.type}
+                    </span>
+                  </div>
+                  {action.amount && (
+                    <span className="text-emerald-400 font-mono text-xs">
+                      {action.amount.toLocaleString()}
                     </span>
                   )}
                 </div>
-              ))}
+
+                {/* Timestamp - show on hover */}
+                <span className="text-slate-600 text-[10px] font-mono opacity-0 group-hover:opacity-100 transition-opacity">
+                  {new Date(action.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </span>
+              </motion.div>
+            );
+          })}
+
+          {/* Winner display */}
+          {winners && winners.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-3 mx-1 p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-500/10 rounded-lg border border-amber-500/30"
+            >
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-amber-500/10 blur-xl rounded-lg" />
+
+              <div className="relative">
+                <div className="text-amber-400 font-bold text-sm text-center mb-2 uppercase tracking-wider">
+                  Winner{winners.length > 1 ? "s" : ""}
+                </div>
+                {winners.map((winner) => (
+                  <div key={winner.playerId} className="text-center py-1">
+                    <span className="text-white font-semibold">{getPlayerName(winner.playerId)}</span>
+                    <span className="text-emerald-400 font-mono font-bold ml-2">
+                      +{winner.amount.toLocaleString()}
+                    </span>
+                    {winner.hand && (
+                      <div className="text-amber-300 text-xs mt-0.5">
+                        {HAND_RANK_NAMES[winner.hand.rank]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </motion.div>
           )}
 
           {actions.length === 0 && (
-            <div className="text-slate-600 text-center py-6 text-sm">
-              No actions yet
+            <div className="text-slate-600 text-center py-8 text-sm">
+              Waiting for actions...
             </div>
           )}
         </div>

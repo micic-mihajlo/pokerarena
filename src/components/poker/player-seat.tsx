@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useMemo } from "react";
 import { evaluateBestHand } from "@/lib/poker/hand-evaluator";
+import { playerSeatVariants, actionBadgeVariants, thinkingDotVariants } from "@/lib/animations";
 
 interface PlayerSeatProps {
   player: Player;
@@ -19,44 +20,44 @@ interface PlayerSeatProps {
 
 const positionStyles: Record<string, { container: React.CSSProperties; chip: React.CSSProperties }> = {
   "top": {
-    container: { top: "2%", left: "50%", transform: "translateX(-50%)" },
-    chip: { bottom: "-24px", left: "50%", transform: "translateX(-50%)" },
+    container: { top: "3%", left: "50%", transform: "translateX(-50%)" },
+    chip: { bottom: "-28px", left: "50%", transform: "translateX(-50%)" },
   },
   "bottom": {
-    container: { bottom: "2%", left: "50%", transform: "translateX(-50%)" },
-    chip: { top: "-24px", left: "50%", transform: "translateX(-50%)" },
+    container: { bottom: "3%", left: "50%", transform: "translateX(-50%)" },
+    chip: { top: "-28px", left: "50%", transform: "translateX(-50%)" },
   },
   "left": {
-    container: { left: "2%", top: "50%", transform: "translateY(-50%)" },
-    chip: { right: "-35px", top: "50%", transform: "translateY(-50%)" },
+    container: { left: "3%", top: "50%", transform: "translateY(-50%)" },
+    chip: { right: "-40px", top: "50%", transform: "translateY(-50%)" },
   },
   "right": {
-    container: { right: "2%", top: "50%", transform: "translateY(-50%)" },
-    chip: { left: "-35px", top: "50%", transform: "translateY(-50%)" },
+    container: { right: "3%", top: "50%", transform: "translateY(-50%)" },
+    chip: { left: "-40px", top: "50%", transform: "translateY(-50%)" },
   },
   "top-left": {
-    container: { top: "12%", left: "8%" },
-    chip: { bottom: "-24px", right: "-20px" },
+    container: { top: "14%", left: "10%" },
+    chip: { bottom: "-28px", right: "-24px" },
   },
   "top-right": {
-    container: { top: "12%", right: "8%" },
-    chip: { bottom: "-24px", left: "-20px" },
+    container: { top: "14%", right: "10%" },
+    chip: { bottom: "-28px", left: "-24px" },
   },
   "bottom-left": {
-    container: { bottom: "12%", left: "8%" },
-    chip: { top: "-24px", right: "-20px" },
+    container: { bottom: "14%", left: "10%" },
+    chip: { top: "-28px", right: "-24px" },
   },
   "bottom-right": {
-    container: { bottom: "12%", right: "8%" },
-    chip: { top: "-24px", left: "-20px" },
+    container: { bottom: "14%", right: "10%" },
+    chip: { top: "-28px", left: "-24px" },
   },
 };
 
-export function PlayerSeat({ 
-  player, 
-  position, 
-  showCards = false, 
-  lastAction, 
+export function PlayerSeat({
+  player,
+  position,
+  showCards = false,
+  lastAction,
   isShowdown,
   communityCards = []
 }: PlayerSeatProps) {
@@ -80,19 +81,53 @@ export function PlayerSeat({
 
   return (
     <motion.div
-      className="absolute flex flex-col items-center"
+      className={cn(
+        "absolute flex flex-col items-center",
+        isActive && "z-10"
+      )}
       style={styles.container}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
+      variants={playerSeatVariants}
+      initial="hidden"
+      animate="visible"
     >
-      {/* cards */}
-      <motion.div
-        className={cn(
-          "flex gap-0.5 mb-1 p-0.5 rounded",
-          isFolded && "opacity-40",
-          isActive && "ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
+      {/* Last action badge - floating above everything */}
+      <AnimatePresence>
+        {lastAction && (
+          <motion.div
+            variants={actionBadgeVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="absolute -top-8 left-1/2 -translate-x-1/2 z-20"
+          >
+            <div className={cn(
+              "flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wide shadow-lg backdrop-blur-sm border",
+              lastAction.type === "fold" && "bg-slate-700/90 text-slate-200 border-slate-600",
+              lastAction.type === "check" && "bg-slate-600/90 text-white border-slate-500",
+              lastAction.type === "call" && "bg-emerald-600/90 text-white border-emerald-500",
+              lastAction.type === "bet" && "bg-amber-600/90 text-white border-amber-500",
+              lastAction.type === "raise" && "bg-rose-600/90 text-white border-rose-500"
+            )}>
+              <span>{lastAction.type}</span>
+              {lastAction.amount && (
+                <span className="font-mono">{lastAction.amount.toLocaleString()}</span>
+              )}
+            </div>
+          </motion.div>
         )}
-      >
+      </AnimatePresence>
+
+      {/* Cards section with backdrop */}
+      <div className={cn(
+        "relative flex gap-1 mb-2 p-1.5 rounded-lg",
+        "bg-gradient-to-b from-slate-800/95 to-slate-900/95",
+        "backdrop-blur-md border",
+        isActive && "border-amber-500/60 shadow-[0_0_20px_rgba(251,191,36,0.3)]",
+        isFolded && "opacity-40 grayscale border-slate-700/50",
+        isOut && "opacity-25 grayscale border-slate-800/50",
+        isAllIn && "border-rose-500/60 shadow-[0_0_15px_rgba(244,63,94,0.3)]",
+        !isActive && !isFolded && !isOut && !isAllIn && "border-slate-700/50"
+      )}>
         {player.holeCards.length > 0 ? (
           player.holeCards.map((card, i) => (
             <PlayingCard
@@ -100,106 +135,125 @@ export function PlayerSeat({
               card={card}
               faceDown={!showCards && !isShowdown}
               size="sm"
+              index={i}
             />
           ))
         ) : (
-          <div className="w-[72px] h-14" />
-        )}
-      </motion.div>
-
-      {/* player info */}
-      <div
-        className={cn(
-          "relative flex flex-col items-center px-3 py-1.5 rounded-lg min-w-[100px]",
-          "bg-slate-800/90 backdrop-blur-sm border",
-          isActive && "border-amber-400",
-          isFolded && "opacity-50 border-slate-700",
-          isOut && "opacity-30 border-slate-700",
-          isAllIn && "border-rose-500",
-          !isActive && !isFolded && !isOut && !isAllIn && "border-slate-700"
-        )}
-      >
-        {/* dealer button */}
-        {player.isDealer && (
-          <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white text-slate-900 text-[10px] font-bold flex items-center justify-center shadow">
-            D
-          </div>
+          <div className="w-[84px] h-[56px]" />
         )}
 
-        {/* name */}
-        <div className="text-white text-xs font-medium truncate max-w-[90px]">
-          {player.name}
-        </div>
-
-        {/* chips */}
-        <div className="text-emerald-400 font-mono text-xs font-bold">
-          {player.chips.toLocaleString()}
-        </div>
-
-        {/* best hand for active player */}
+        {/* Best hand badge */}
         {isActive && bestHand && (
-          <div className="text-amber-400 text-[9px] mt-0.5">
+          <div className="absolute -right-1 -top-1 px-1.5 py-0.5 rounded bg-amber-500 text-black text-[8px] font-bold shadow-sm">
             {HAND_RANK_NAMES[bestHand.rank]}
-          </div>
-        )}
-
-        {/* status */}
-        {isAllIn && (
-          <div className="text-rose-400 text-[9px] font-bold mt-0.5">ALL IN</div>
-        )}
-        {isFolded && (
-          <div className="text-slate-500 text-[9px] mt-0.5">FOLDED</div>
-        )}
-
-        {/* thinking indicator */}
-        {isActive && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                className="w-1 h-1 rounded-full bg-amber-400"
-                animate={{ opacity: [0.3, 1, 0.3] }}
-                transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
-              />
-            ))}
           </div>
         )}
       </div>
 
-      {/* bet chip */}
+      {/* Main Player HUD Box */}
+      <div className={cn(
+        "relative min-w-[120px] rounded-lg overflow-hidden",
+        "bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95",
+        "backdrop-blur-md border-2",
+        isActive && "border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]",
+        isAllIn && !isActive && "border-rose-500 shadow-[0_0_18px_rgba(244,63,94,0.3)]",
+        isFolded && "border-slate-700/60 opacity-60",
+        isOut && "border-slate-800/60 opacity-30",
+        !isActive && !isAllIn && !isFolded && !isOut && "border-slate-600/60"
+      )}>
+        {/* Animated gradient sweep for active player */}
+        {isActive && (
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-amber-500/10 via-amber-400/20 to-amber-500/10"
+            animate={{
+              backgroundPosition: ["0% 50%", "200% 50%"],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+            style={{ backgroundSize: "200% 100%" }}
+          />
+        )}
+
+        {/* Player name bar */}
+        <div className="relative px-3 py-1.5 bg-slate-800/60 border-b border-slate-700/40">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-white font-semibold text-sm truncate max-w-[80px]">
+              {player.name}
+            </span>
+            {/* Dealer button */}
+            {player.isDealer && (
+              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-white to-slate-200 text-slate-900 text-[9px] font-black flex items-center justify-center shadow-md">
+                D
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Chips display */}
+        <div className="relative px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* Chip icon */}
+            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 border border-amber-300 shadow-sm" />
+            <span className="text-emerald-400 font-mono text-base font-bold tracking-tight">
+              {player.chips.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        {/* Status bar */}
+        {(isAllIn || isFolded) && (
+          <div className={cn(
+            "px-3 py-1 text-center text-[10px] font-bold uppercase tracking-wider",
+            isAllIn && "bg-rose-500/20 text-rose-400",
+            isFolded && "bg-slate-600/20 text-slate-400"
+          )}>
+            {isAllIn ? "ALL IN" : "FOLDED"}
+          </div>
+        )}
+
+        {/* Thinking progress bar */}
+        {isActive && (
+          <motion.div
+            className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-amber-300 to-amber-500"
+            animate={{
+              opacity: [0.5, 1, 0.5],
+            }}
+            transition={{
+              duration: 1.2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+        )}
+      </div>
+
+      {/* Thinking indicator dots */}
+      {isActive && (
+        <div className="flex gap-1 mt-1.5">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-amber-400"
+              variants={thinkingDotVariants}
+              animate="animate"
+              custom={i}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Bet chip */}
       {player.currentBet > 0 && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
+        <div
           className="absolute"
           style={styles.chip}
         >
           <ChipStack amount={player.currentBet} size="sm" />
-        </motion.div>
+        </div>
       )}
-
-      {/* last action */}
-      <AnimatePresence>
-        {lastAction && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="absolute -top-6 left-1/2 -translate-x-1/2"
-          >
-            <div className={cn(
-              "text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow",
-              lastAction.type === "fold" && "bg-slate-600 text-slate-200",
-              lastAction.type === "check" && "bg-slate-500 text-white",
-              lastAction.type === "call" && "bg-emerald-600 text-white",
-              lastAction.type === "bet" && "bg-amber-600 text-white",
-              lastAction.type === "raise" && "bg-rose-600 text-white"
-            )}>
-              {lastAction.type}{lastAction.amount ? ` ${lastAction.amount}` : ""}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

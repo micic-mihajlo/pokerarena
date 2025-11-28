@@ -3,6 +3,8 @@
 import { Card } from "@/types/poker";
 import { PlayingCard } from "./card";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
+import { communityCardVariants } from "@/lib/animations";
 
 interface CommunityCardsProps {
   cards: Card[];
@@ -11,15 +13,21 @@ interface CommunityCardsProps {
 
 export function CommunityCards({ cards, className }: CommunityCardsProps) {
   return (
-    <div className={cn("flex gap-1.5 items-center justify-center", className)}>
+    <div className={cn("flex gap-2 items-center justify-center", className)}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i}>
+        <motion.div
+          key={i}
+          variants={communityCardVariants}
+          initial="hidden"
+          animate={cards[i] ? "visible" : "hidden"}
+          custom={i}
+        >
           {cards[i] ? (
-            <PlayingCard card={cards[i]} size="md" />
+            <PlayingCard card={cards[i]} size="lg" index={i} />
           ) : (
-            <div className="w-12 h-[68px] rounded border border-dashed border-white/20" />
+            <div className="w-[72px] h-[100px] rounded-lg border-2 border-dashed border-white/10 bg-white/5 backdrop-blur-sm" />
           )}
-        </div>
+        </motion.div>
       ))}
     </div>
   );

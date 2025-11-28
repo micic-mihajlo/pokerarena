@@ -209,38 +209,73 @@ export default function Home() {
   }
 
   return (
-    <main className="h-screen bg-slate-950 p-4 md:p-6 flex flex-col overflow-hidden">
-      {/* header */}
-      <div className="max-w-[1800px] w-full mx-auto mb-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-emerald-400">Poker</span>
-              <span className="text-white">Arena</span>
-            </h1>
-            <p className="text-slate-500 text-sm">
-              LLM Poker Benchmark
-            </p>
-          </div>
-
-          {isRunning && !isPaused && (
-            <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-slate-300 text-sm">Live</span>
-            </div>
-          )}
-        </div>
+    <main className="h-screen bg-slate-950 flex flex-col overflow-hidden">
+      {/* Ambient background effects */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-radial from-slate-900/50 via-slate-950 to-black" />
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-900/15 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-amber-900/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* main content */}
-      <div className="max-w-[1800px] w-full mx-auto flex-1 min-h-0">
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 h-full">
-          {/* left panel - AI reasoning */}
+      {/* Header - Broadcast style */}
+      <header className="relative z-10 flex-shrink-0 border-b border-slate-800/50 backdrop-blur-sm bg-slate-950/80">
+        <div className="max-w-[2000px] w-full mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <span className="text-white font-bold text-lg">P</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">
+                <span className="text-emerald-400">Poker</span>
+                <span className="text-white">Arena</span>
+              </h1>
+              <p className="text-slate-500 text-xs">LLM Poker Championship</p>
+            </div>
+          </div>
+
+          {/* Live indicator */}
+          {isRunning && !isPaused && (
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-red-400 text-sm font-medium uppercase tracking-wider">Live</span>
+            </div>
+          )}
+
+          {/* Game stats bar */}
+          <div className="hidden md:flex items-center gap-6 text-sm">
+            <div>
+              <span className="text-slate-500">Hand</span>
+              <span className="text-white font-mono ml-2">#{gameState.handNumber}</span>
+            </div>
+            <div>
+              <span className="text-slate-500">Blinds</span>
+              <span className="text-amber-400 font-mono ml-2">
+                {gameState.smallBlind}/{gameState.bigBlind}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500">Players</span>
+              <span className="text-emerald-400 font-mono ml-2">
+                {gameState.players.filter(p => p.status !== "out").length}/{gameState.players.length}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="relative z-10 flex-1 min-h-0 max-w-[2000px] w-full mx-auto p-4 lg:p-6">
+        <div className="grid grid-cols-1 xl:grid-cols-14 gap-4 lg:gap-6 h-full">
+          {/* Left panel - AI reasoning */}
           <div className="xl:col-span-3 order-2 xl:order-1 flex flex-col min-h-0">
-            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col flex-1 min-h-0">
-              <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-                <span className="text-white font-medium text-sm">AI Reasoning</span>
-                <span className="text-slate-500 text-xs">Hand #{gameState.handNumber}</span>
+            <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex flex-col flex-1 min-h-0 shadow-xl">
+              <div className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-white font-semibold text-sm">AI Reasoning</span>
+                </div>
+                <span className="text-slate-500 text-xs font-mono">Hand #{gameState.handNumber}</span>
               </div>
 
               <ScrollArea className="flex-1 min-h-0" ref={reasoningScrollRef}>
@@ -248,21 +283,21 @@ export default function Home() {
                   {reasoningHistory.map((entry) => (
                     <motion.div
                       key={entry.id}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-slate-800/50 rounded-lg p-3"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30"
                     >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-white text-sm font-medium">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white text-sm font-semibold">
                           {entry.playerName}
                         </span>
                         <span className={cn(
-                          "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
-                          entry.action === "fold" && "bg-slate-700 text-slate-300",
-                          entry.action === "check" && "bg-slate-700 text-slate-300",
-                          entry.action === "call" && "bg-emerald-900 text-emerald-400",
-                          entry.action === "bet" && "bg-amber-900 text-amber-400",
-                          entry.action === "raise" && "bg-rose-900 text-rose-400"
+                          "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full",
+                          entry.action === "fold" && "bg-slate-700/80 text-slate-300",
+                          entry.action === "check" && "bg-slate-700/80 text-slate-300",
+                          entry.action === "call" && "bg-emerald-600/80 text-emerald-100",
+                          entry.action === "bet" && "bg-amber-600/80 text-amber-100",
+                          entry.action === "raise" && "bg-rose-600/80 text-rose-100"
                         )}>
                           {entry.action}
                         </span>
@@ -279,17 +314,17 @@ export default function Home() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="bg-slate-800/30 border border-dashed border-slate-700 rounded-lg p-3"
+                        className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="text-white text-sm">{thinkingState.playerName}</span>
-                          <div className="flex gap-0.5">
+                          <span className="text-amber-300 text-sm font-medium">{thinkingState.playerName}</span>
+                          <div className="flex gap-1">
                             {[0, 1, 2].map((i) => (
                               <motion.div
                                 key={i}
-                                className="w-1 h-1 rounded-full bg-amber-400"
-                                animate={{ opacity: [0.3, 1, 0.3] }}
-                                transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.15 }}
+                                className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                                animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
                               />
                             ))}
                           </div>
@@ -300,7 +335,7 @@ export default function Home() {
 
                   {reasoningHistory.length === 0 && !thinkingState?.isThinking && (
                     <div className="text-center py-8 text-slate-600 text-sm">
-                      Waiting for game...
+                      Waiting for game to start...
                     </div>
                   )}
                 </div>
@@ -308,16 +343,16 @@ export default function Home() {
             </div>
           </div>
 
-          {/* center - poker table */}
-          <div className="xl:col-span-6 order-1 xl:order-2 flex flex-col min-h-0">
+          {/* Center - Poker table (wider) */}
+          <div className="xl:col-span-8 order-1 xl:order-2 flex flex-col min-h-0">
             <PokerTable gameState={gameState} className="flex-1" />
-            <p className="text-center text-slate-600 text-xs mt-1 flex-shrink-0">
-              Spectator view — LLMs only see their own cards
+            <p className="text-center text-slate-600 text-[11px] mt-2 flex-shrink-0">
+              Spectator View - All cards visible
             </p>
           </div>
 
-          {/* right panel */}
-          <div className="xl:col-span-3 order-3 flex flex-col gap-3 min-h-0">
+          {/* Right panel */}
+          <div className="xl:col-span-3 order-3 flex flex-col gap-4 min-h-0">
             <ActionLog
               actions={gameState.actionLog}
               players={gameState.players}
@@ -327,10 +362,11 @@ export default function Home() {
               className="flex-1 min-h-0"
             />
 
-            {/* standings */}
-            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex-shrink-0">
-              <div className="px-4 py-2 border-b border-slate-800">
-                <span className="text-white font-medium text-sm">Standings</span>
+            {/* Standings */}
+            <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex-shrink-0 shadow-xl">
+              <div className="px-4 py-3 border-b border-slate-800/60 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-white font-semibold text-sm">Standings</span>
               </div>
               <div className="p-2">
                 {[...gameState.players]
@@ -339,18 +375,23 @@ export default function Home() {
                     <div
                       key={player.id}
                       className={cn(
-                        "flex items-center justify-between px-3 py-2 rounded",
-                        i === 0 && "bg-slate-800/50"
+                        "flex items-center justify-between px-3 py-2 rounded-lg transition-colors",
+                        i === 0 && "bg-amber-500/10 border border-amber-500/20"
                       )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <span className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                          i === 0 ? "bg-amber-500 text-black" : "bg-slate-700 text-slate-400"
+                          "w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold",
+                          i === 0 ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black shadow-md" : "bg-slate-700 text-slate-400"
                         )}>
                           {i + 1}
                         </span>
-                        <span className="text-white text-sm">{player.name}</span>
+                        <span className={cn(
+                          "text-sm font-medium",
+                          player.status === "out" ? "text-slate-500 line-through" : "text-white"
+                        )}>
+                          {player.name}
+                        </span>
                       </div>
                       <span className="text-emerald-400 font-mono text-sm font-bold">
                         {player.chips.toLocaleString()}
@@ -363,10 +404,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* game controls - fixed at bottom */}
-      <div className="max-w-[1800px] w-full mx-auto mt-auto pt-3 flex-shrink-0">
-        <GameControls onReset={handleReset} />
-      </div>
+      {/* Game controls - fixed bottom bar */}
+      <footer className="relative z-10 flex-shrink-0 border-t border-slate-800/50 backdrop-blur-sm bg-slate-900/80">
+        <div className="max-w-[2000px] w-full mx-auto px-4 lg:px-6 py-4">
+          <GameControls onReset={handleReset} />
+        </div>
+      </footer>
     </main>
   );
 }
