@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { openrouter } from "@/lib/openrouter";
+import { openrouter, createOpenRouterClient } from "@/lib/openrouter";
 import { GameState, Player, ActionType, ValidActions } from "@/types/poker";
 import { getValidActions } from "@/lib/poker/engine";
 import { POKER_SYSTEM_PROMPT, formatGameStatePrompt } from "./prompts";
@@ -99,22 +99,26 @@ function extractNativeReasoning(reasoning: unknown): string | undefined {
 // get action from llm player
 export async function getLLMAction(
   state: GameState,
-  player: Player
+  player: Player,
+  apiKey?: string
 ): Promise<LLMActionResult> {
   const validActions = getValidActions(state);
   let prompt = formatGameStatePrompt(state, player, validActions);
-  
+
   // gemini doesn't respect include_reasoning, so ask explicitly
   if (player.model.includes("gemini")) {
     prompt += "\n\nFirst briefly explain your reasoning, then give your action as JSON.";
   }
 
+  // use custom API key if provided, otherwise fall back to default
+  const modelFn = apiKey ? createOpenRouterClient(apiKey) : openrouter;
+
   try {
     const result = await generateText({
-      model: openrouter(player.model),
+      model: modelFn(player.model),
       system: POKER_SYSTEM_PROMPT,
       prompt,
-      maxTokens: 1024,
+      maxOutputTokens: 1024,
       temperature: 0.7,
     });
 

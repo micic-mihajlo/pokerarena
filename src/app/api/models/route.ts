@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export interface OpenRouterModel {
   id: string;
@@ -21,13 +21,24 @@ export interface ModelOption {
   popularityRank: number;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // get API key from query params or header
+    const apiKey = request.nextUrl.searchParams.get("apiKey") ||
+      request.headers.get("x-api-key");
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "API key is required" },
+        { status: 401 }
+      );
+    }
+
     const response = await fetch(
       "https://openrouter.ai/api/v1/models?supported_parameters=include_reasoning",
       {
         headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
       }
     );

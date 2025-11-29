@@ -2,14 +2,18 @@
 
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useGameStore } from "@/stores/game-store";
+import { useApiKeyStore } from "@/stores/api-key-store";
 import { PokerTable } from "@/components/poker/poker-table";
 import { ActionLog } from "@/components/poker/action-log";
-import { GameControls } from "@/components/poker/game-controls";
+import { SettingsDialog } from "@/components/poker/settings-dialog";
+import { WelcomeScreen } from "@/components/welcome-screen";
+import { Button } from "@/components/ui/button";
 import { GameState } from "@/types/poker";
 import { ACTION_DELAY, PHASE_TRANSITION_DELAY } from "@/lib/poker/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
+import { Play, Pause, RotateCcw } from "lucide-react";
 
 interface ThinkingEntry {
   id: string;
@@ -36,9 +40,14 @@ export default function Home() {
     isPaused,
     speed,
     initGame,
+    startGame,
+    pauseGame,
+    resumeGame,
     nextHand,
     setError,
   } = useGameStore();
+
+  const { apiKey, isValidated, loadFromStorage } = useApiKeyStore();
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
@@ -46,11 +55,20 @@ export default function Home() {
   const [reasoningHistory, setReasoningHistory] = useState<ThinkingEntry[]>([]);
   const reasoningScrollRef = useRef<HTMLDivElement>(null);
   const lastHandNumberRef = useRef<number>(0);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // initialize game on mount
+  // load API key from storage on mount
   useEffect(() => {
-    initGame();
-  }, [initGame]);
+    loadFromStorage();
+    setIsHydrated(true);
+  }, [loadFromStorage]);
+
+  // initialize game on mount (only when we have API key)
+  useEffect(() => {
+    if (apiKey && isValidated) {
+      initGame();
+    }
+  }, [initGame, apiKey, isValidated]);
 
   // clear reasoning history when hand number changes
   useEffect(() => {
@@ -70,7 +88,8 @@ export default function Home() {
   // fetch action from api
   const fetchAction = useCallback(async (state: GameState) => {
     const currentPlayer = state.players[state.currentPlayerIndex];
-    
+    const currentApiKey = useApiKeyStore.getState().apiKey;
+
     setThinkingState({
       playerId: currentPlayer.id,
       playerName: currentPlayer.name,
@@ -90,6 +109,7 @@ export default function Home() {
               actedPlayers: Array.from(state.bettingRound.actedPlayers),
             },
           },
+          apiKey: currentApiKey,
         }),
       });
 
@@ -200,10 +220,25 @@ export default function Home() {
     useGameStore.getState().resetGame();
   };
 
-  if (!gameState) {
+  // show loading while hydrating
+  if (!isHydrated) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // show welcome screen if no API key
+  if (!apiKey || !isValidated) {
+    return <WelcomeScreen />;
+  }
+
+  // show loading while game initializes
+  if (!gameState) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-white text-xl">Initializing game...</div>
       </div>
     );
   }
@@ -217,15 +252,15 @@ export default function Home() {
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-amber-900/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* Header - Broadcast style */}
+      {/* Header - Broadcast style with controls */}
       <header className="relative z-10 flex-shrink-0 border-b border-slate-800/50 backdrop-blur-sm bg-slate-950/80">
-        <div className="max-w-[2000px] w-full mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
+        <div className="max-w-[2000px] w-full mx-auto px-4 lg:px-6 py-3 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <span className="text-white font-bold text-lg">P</span>
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-xl font-bold tracking-tight">
                 <span className="text-emerald-400">Poker</span>
                 <span className="text-white">Arena</span>
@@ -234,32 +269,82 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Live indicator */}
-          {isRunning && !isPaused && (
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-red-400 text-sm font-medium uppercase tracking-wider">Live</span>
-            </div>
-          )}
+          {/* Center: Game stats + Live indicator */}
+          <div className="flex items-center gap-4 lg:gap-6">
+            {/* Live indicator */}
+            {isRunning && !isPaused && (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-red-400 text-xs font-medium uppercase tracking-wider">Live</span>
+              </div>
+            )}
 
-          {/* Game stats bar */}
-          <div className="hidden md:flex items-center gap-6 text-sm">
-            <div>
-              <span className="text-slate-500">Hand</span>
-              <span className="text-white font-mono ml-2">#{gameState.handNumber}</span>
+            {/* Game stats */}
+            <div className="hidden md:flex items-center gap-4 lg:gap-6 text-sm">
+              <div>
+                <span className="text-slate-500">Hand</span>
+                <span className="text-white font-mono ml-2">#{gameState.handNumber}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Blinds</span>
+                <span className="text-amber-400 font-mono ml-2">
+                  {gameState.smallBlind}/{gameState.bigBlind}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500">Players</span>
+                <span className="text-emerald-400 font-mono ml-2">
+                  {gameState.players.filter(p => p.status !== "out").length}/{gameState.players.length}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-slate-500">Blinds</span>
-              <span className="text-amber-400 font-mono ml-2">
-                {gameState.smallBlind}/{gameState.bigBlind}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-500">Players</span>
-              <span className="text-emerald-400 font-mono ml-2">
-                {gameState.players.filter(p => p.status !== "out").length}/{gameState.players.length}
-              </span>
-            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            {!isRunning || gameState.phase === "complete" ? (
+              <Button
+                onClick={startGame}
+                size="sm"
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              >
+                <Play className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{gameState.phase === "complete" ? "New Game" : "Start"}</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={isPaused ? resumeGame : pauseGame}
+                size="sm"
+                variant={isPaused ? "default" : "secondary"}
+                className="gap-1.5"
+              >
+                {isPaused ? (
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Resume</span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Pause</span>
+                  </>
+                )}
+              </Button>
+            )}
+
+            <Button
+              onClick={handleReset}
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-slate-400 hover:text-white"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reset</span>
+            </Button>
+
+            <div className="w-px h-6 bg-slate-700 mx-1 hidden sm:block" />
+
+            <SettingsDialog disabled={isRunning && !isPaused} />
           </div>
         </div>
       </header>
@@ -346,9 +431,6 @@ export default function Home() {
           {/* Center - Poker table (wider) */}
           <div className="xl:col-span-8 order-1 xl:order-2 flex flex-col min-h-0">
             <PokerTable gameState={gameState} className="flex-1" />
-            <p className="text-center text-slate-600 text-[11px] mt-2 flex-shrink-0">
-              Spectator View - All cards visible
-            </p>
           </div>
 
           {/* Right panel */}
@@ -403,13 +485,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Game controls - fixed bottom bar */}
-      <footer className="relative z-10 flex-shrink-0 border-t border-slate-800/50 backdrop-blur-sm bg-slate-900/80">
-        <div className="max-w-[2000px] w-full mx-auto px-4 lg:px-6 py-4">
-          <GameControls onReset={handleReset} />
-        </div>
-      </footer>
     </main>
   );
 }

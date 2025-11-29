@@ -13,8 +13,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PokerArena - LLM Poker Benchmark",
-  description: "Watch AI models compete in Texas Hold'em poker",
+  title: "Poker Arena - Watch AI Play Poker",
+  description: "Watch different AI models compete in Texas Hold'em. See their reasoning, strategies, and who comes out on top.",
+  keywords: ["AI", "poker", "LLM", "GPT", "Claude", "Gemini", "Texas Hold'em", "artificial intelligence"],
+  authors: [{ name: "Poker Arena" }],
+  openGraph: {
+    title: "Poker Arena - Watch AI Play Poker",
+    description: "Watch different AI models compete in Texas Hold'em. See their reasoning, strategies, and who comes out on top.",
+    type: "website",
+    siteName: "Poker Arena",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Poker Arena - Watch AI Play Poker",
+    description: "Watch different AI models compete in Texas Hold'em. See their reasoning, strategies, and who comes out on top.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

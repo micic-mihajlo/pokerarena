@@ -2,18 +2,18 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useGameStore } from "@/stores/game-store";
+import { useApiKeyStore } from "@/stores/api-key-store";
 import { LLMPlayer } from "@/types/poker";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Settings, Plus, X, Search, Check, ChevronLeft } from "lucide-react";
+import { Settings, Plus, X, Search, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 
 interface ModelOption {
   id: string;
@@ -28,6 +28,7 @@ type ViewState = "main" | "add-player" | { type: "edit-player"; playerId: string
 
 export function SettingsDialog({ disabled }: { disabled?: boolean }) {
   const { config, setConfig, initGame, isRunning } = useGameStore();
+  const { apiKey, clearApiKey } = useApiKeyStore();
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -37,6 +38,10 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
   const [bigBlind, setBigBlind] = useState(config.bigBlind);
   const [view, setView] = useState<ViewState>("main");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const maskedApiKey = apiKey
+    ? `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`
+    : "";
 
   useEffect(() => {
     if (open) {
@@ -56,9 +61,12 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
   }, [open, models.length]);
 
   const fetchModels = async () => {
+    if (!apiKey) return;
     setLoadingModels(true);
     try {
-      const res = await fetch("/api/models");
+      const res = await fetch("/api/models", {
+        headers: { "x-api-key": apiKey },
+      });
       const data = await res.json();
       if (data.models) setModels(data.models);
     } catch (e) {
@@ -68,15 +76,34 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
     }
   };
 
+  const MAX_DISPLAY = 25;
+
   const filteredModels = useMemo(() => {
-    if (!searchQuery.trim()) return models;
+    let result = models;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = models.filter(
+        (m) =>
+          m.name.toLowerCase().includes(q) ||
+          m.provider.toLowerCase().includes(q) ||
+          m.id.toLowerCase().includes(q)
+      );
+    }
+
+    // Limit display to prevent overflow
+    return result.slice(0, MAX_DISPLAY);
+  }, [models, searchQuery]);
+
+  const totalMatchingModels = useMemo(() => {
+    if (!searchQuery.trim()) return models.length;
     const q = searchQuery.toLowerCase();
     return models.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.provider.toLowerCase().includes(q) ||
         m.id.toLowerCase().includes(q)
-    );
+    ).length;
   }, [models, searchQuery]);
 
   const removePlayer = (id: string) => {
@@ -114,126 +141,120 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
     setOpen(false);
   };
 
-  const providerColors: Record<string, string> = {
-    openai: "text-emerald-400",
-    anthropic: "text-orange-400",
-    google: "text-blue-400",
-    meta: "text-indigo-400",
-    mistralai: "text-purple-400",
-    deepseek: "text-cyan-400",
-    "x-ai": "text-neutral-300",
-    qwen: "text-rose-400",
-  };
-
-  const getProviderColor = (provider: string) =>
-    providerColors[provider.toLowerCase().replace(" ", "")] || "text-slate-400";
-
-  // model picker view
+  // Model picker view
   const renderModelPicker = (onSelect: (model: ModelOption) => void) => (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 p-4 border-b border-slate-800">
-        <button
-          onClick={() => {
-            setView("main");
-            setSearchQuery("");
-          }}
-          className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="relative flex-1">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setView("main");
+              setSearchQuery("");
+            }}
+            className="p-1.5 -ml-1.5 rounded-md text-slate-400 hover:text-white transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <span className="text-sm font-medium text-white">Select Model</span>
+        </div>
+        {!loadingModels && (
+          <span className="text-xs text-slate-500">
+            {totalMatchingModels > MAX_DISPLAY
+              ? `${MAX_DISPLAY} of ${totalMatchingModels}`
+              : totalMatchingModels}
+          </span>
+        )}
+      </div>
+
+      <div className="px-5 py-3 border-b border-slate-800/80">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search models..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm focus:outline-none focus:border-slate-600"
+            className="w-full pl-9 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-slate-600"
             autoFocus
           />
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {loadingModels ? (
-          <div className="flex items-center justify-center py-12 text-slate-500">
-            <div className="w-5 h-5 border-2 border-slate-600 border-t-slate-400 rounded-full animate-spin mr-2" />
-            Loading...
+          <div className="flex items-center justify-center py-12 text-slate-500 text-sm">
+            <div className="w-4 h-4 border-2 border-slate-700 border-t-slate-400 rounded-full animate-spin mr-2" />
+            Loading models...
           </div>
         ) : filteredModels.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">No models found</div>
+          <div className="text-center py-12 text-slate-500 text-sm">
+            No models found
+          </div>
         ) : (
-          <div className="p-2">
-            {filteredModels.map((model, i) => (
+          <div className="py-1">
+            {filteredModels.map((model) => (
               <button
                 key={model.id}
                 onClick={() => onSelect(model)}
-                className="w-full text-left px-3 py-2.5 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-between group"
+                className="w-full text-left px-5 py-2.5 hover:bg-slate-800/50 transition-colors flex items-center justify-between group"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white">
-                      {model.name}
-                    </span>
-                    {i < 5 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">
-                        TOP
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className={cn("text-xs", getProviderColor(model.provider))}>
-                      {model.provider}
-                    </span>
-                    <span className="text-xs text-slate-600">•</span>
-                    <span className="text-xs text-slate-500">{model.pricing}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-white truncate">{model.name}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {model.provider} · {model.pricing}
                   </div>
                 </div>
-                <Plus className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 transition-colors" />
+                <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 shrink-0 ml-3" />
               </button>
             ))}
+            {totalMatchingModels > MAX_DISPLAY && (
+              <div className="px-5 py-3 text-xs text-slate-500 text-center border-t border-slate-800/50">
+                Search to find more models
+              </div>
+            )}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 
-  // main settings view
+  // Main settings view
   const renderMain = () => (
     <>
-      <DialogHeader className="px-5 py-4 border-b border-slate-800">
-        <DialogTitle className="text-base font-semibold">Settings</DialogTitle>
-      </DialogHeader>
+      <div className="px-5 py-4 border-b border-slate-800/80">
+        <h2 className="text-base font-semibold text-white">Settings</h2>
+      </div>
 
       <ScrollArea className="flex-1">
         <div className="p-5 space-y-6">
-          {/* players */}
+          {/* Players */}
           <section>
             <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Players ({players.length}/6)
+              <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                Players
               </label>
+              <span className="text-xs text-slate-500">{players.length}/6</span>
             </div>
 
-            <div className="space-y-1.5">
-              {players.map((player) => (
+            <div className="space-y-1">
+              {players.map((player, index) => (
                 <div
                   key={player.id}
-                  className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/40 border border-slate-800 group"
+                  className="group flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-800/50 transition-colors"
                 >
+                  <span className="w-5 text-xs text-slate-500 tabular-nums">{index + 1}.</span>
                   <div
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => setView({ type: "edit-player", playerId: player.id })}
                   >
-                    <div className="text-sm font-medium truncate">{player.name}</div>
-                    <div className="text-xs text-slate-500 truncate">{player.model}</div>
+                    <div className="text-sm text-white truncate">{player.name}</div>
                   </div>
                   {players.length > 2 && (
                     <button
                       onClick={() => removePlayer(player.id)}
-                      className="p-1 rounded text-slate-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-1 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
@@ -243,50 +264,44 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
                 <button
                   onClick={() => setView("add-player")}
                   disabled={loadingModels}
-                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400 hover:bg-slate-800/30 transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-sm">Add Player</span>
+                  <Plus className="w-4 h-4 ml-0.5" />
+                  <span className="text-sm">Add player</span>
                 </button>
               )}
             </div>
           </section>
 
-          {/* chips */}
+          {/* Starting Chips */}
           <section>
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-3">
+            <label className="text-xs font-medium text-slate-400 uppercase tracking-wide block mb-3">
               Starting Chips
             </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {[500, 1000, 2000, 5000, 10000].map((v) => (
                 <button
                   key={v}
                   onClick={() => setStartingChips(v)}
                   className={cn(
-                    "px-3 py-1.5 rounded-md text-sm transition-colors",
+                    "px-4 py-2 rounded-lg text-sm transition-colors",
                     startingChips === v
-                      ? "bg-emerald-500/20 text-emerald-400 font-medium"
-                      : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                      ? "bg-white text-slate-900 font-medium"
+                      : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
                   )}
                 >
                   {v.toLocaleString()}
                 </button>
               ))}
-              <input
-                type="number"
-                value={startingChips}
-                onChange={(e) => setStartingChips(Math.max(100, parseInt(e.target.value) || 100))}
-                className="w-20 px-2 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-sm text-center focus:outline-none focus:border-slate-600"
-              />
             </div>
           </section>
 
-          {/* blinds */}
+          {/* Blinds */}
           <section>
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-3">
-              Blinds (Small / Big)
+            <label className="text-xs font-medium text-slate-400 uppercase tracking-wide block mb-3">
+              Blinds
             </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {[
                 [5, 10],
                 [10, 20],
@@ -301,45 +316,57 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
                     setBigBlind(b);
                   }}
                   className={cn(
-                    "px-3 py-1.5 rounded-md text-sm transition-colors",
+                    "px-4 py-2 rounded-lg text-sm transition-colors",
                     smallBlind === s && bigBlind === b
-                      ? "bg-emerald-500/20 text-emerald-400 font-medium"
-                      : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                      ? "bg-white text-slate-900 font-medium"
+                      : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
                   )}
                 >
                   {s}/{b}
                 </button>
               ))}
-              <div className="flex items-center gap-1 text-slate-500">
-                <input
-                  type="number"
-                  value={smallBlind}
-                  onChange={(e) => setSmallBlind(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-14 px-2 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-sm text-center focus:outline-none focus:border-slate-600"
-                />
-                <span>/</span>
-                <input
-                  type="number"
-                  value={bigBlind}
-                  onChange={(e) => setBigBlind(Math.max(2, parseInt(e.target.value) || 2))}
-                  className="w-14 px-2 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-sm text-center focus:outline-none focus:border-slate-600"
-                />
+            </div>
+          </section>
+
+          {/* API Key */}
+          <section className="pt-4 border-t border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
+                  API Key
+                </div>
+                <div className="text-sm font-mono text-slate-300">{maskedApiKey}</div>
               </div>
+              <button
+                onClick={() => {
+                  clearApiKey();
+                  setOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sign out
+              </button>
             </div>
           </section>
         </div>
       </ScrollArea>
 
-      <div className="flex justify-end gap-2 p-4 border-t border-slate-800">
-        <Button variant="ghost" onClick={() => setOpen(false)}>
+      <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-800/80">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setOpen(false)}
+          className="text-slate-400"
+        >
           Cancel
         </Button>
         <Button
+          size="sm"
           onClick={handleSave}
-          className="bg-emerald-600 hover:bg-emerald-700"
           disabled={players.length < 2 || players.some((p) => !p.model)}
+          className="bg-white text-slate-900 hover:bg-slate-200"
         >
-          <Check className="w-4 h-4 mr-1.5" />
           Apply
         </Button>
       </div>
@@ -349,13 +376,19 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="lg" className="gap-2" disabled={disabled || isRunning}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-slate-400 hover:text-white"
+          disabled={disabled || isRunning}
+        >
           <Settings className="w-4 h-4" />
-          Settings
+          <span className="hidden sm:inline">Settings</span>
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-white p-0 gap-0 flex flex-col max-h-[85vh]">
+      <DialogContent className="max-w-sm bg-slate-900 border-slate-800 text-white p-0 gap-0 flex flex-col max-h-[85vh]">
+        <DialogTitle className="sr-only">Game Settings</DialogTitle>
         {view === "main" && renderMain()}
         {view === "add-player" && renderModelPicker(selectModelForNewPlayer)}
         {typeof view === "object" &&

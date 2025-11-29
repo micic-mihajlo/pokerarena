@@ -7,8 +7,6 @@ export interface LLMResponse {
 
 // parse llm response to extract action
 export function parseResponse(text: string, validActions: ValidActions): LLMResponse {
-  console.log("Raw LLM response:", text);
-  
   // try multiple json extraction methods
   let parsed: { action?: string; reasoning?: string } | null = null;
 

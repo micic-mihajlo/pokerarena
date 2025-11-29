@@ -9,6 +9,7 @@ export const maxDuration = 30;
 
 interface ActionRequest {
   gameState: GameState;
+  apiKey?: string;
 }
 
 interface ActionResponse {
@@ -21,10 +22,14 @@ interface ActionResponse {
 export async function POST(request: NextRequest): Promise<NextResponse<ActionResponse | { error: string }>> {
   try {
     const body = (await request.json()) as ActionRequest;
-    const { gameState } = body;
+    const { gameState, apiKey } = body;
 
     if (!gameState) {
       return NextResponse.json({ error: "Missing game state" }, { status: 400 });
+    }
+
+    if (!apiKey) {
+      return NextResponse.json({ error: "API key is required" }, { status: 401 });
     }
 
     // get current player
@@ -48,7 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ActionRes
     };
 
     // get llm action
-    const result = await getLLMAction(reconstructedState, currentPlayer);
+    const result = await getLLMAction(reconstructedState, currentPlayer, apiKey);
 
     // validate and apply action
     const validation = validateAction(reconstructedState, currentPlayer.id, result.action);

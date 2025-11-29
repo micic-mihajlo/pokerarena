@@ -1,13 +1,28 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
-// create openrouter client
-const openrouterClient = createOpenRouter({
+// create openrouter client with custom API key
+export function createOpenRouterClient(apiKey: string) {
+  const client = createOpenRouter({
+    apiKey,
+  });
+
+  // wrapper that enables reasoning for all models
+  return function openrouter(modelId: string) {
+    return client(modelId, {
+      extraBody: {
+        include_reasoning: true,
+      },
+    });
+  };
+}
+
+// default client using env variable (for backwards compatibility)
+const defaultClient = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY || "",
 });
 
-// wrapper that enables reasoning for all models
 export function openrouter(modelId: string) {
-  return openrouterClient(modelId, {
+  return defaultClient(modelId, {
     extraBody: {
       include_reasoning: true,
     },

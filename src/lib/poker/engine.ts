@@ -390,7 +390,7 @@ function advancePhase(state: GameState): GameState {
 
 // end the hand and distribute pot
 function endHand(state: GameState): GameState {
-  let newState = { ...state };
+  const newState = { ...state };
   newState.phase = "showdown";
 
   // clear isTurn
