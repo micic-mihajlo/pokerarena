@@ -11,38 +11,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // basic format validation
-    if (!apiKey.startsWith("sk-or-")) {
-      return NextResponse.json(
-        { valid: false, error: "Invalid API key format. OpenRouter keys start with 'sk-or-'" },
-        { status: 400 }
-      );
-    }
+    const useOpenRouter = apiKey.startsWith("sk-or-");
 
-    // validate by calling OpenRouter models endpoint
-    const response = await fetch("https://openrouter.ai/api/v1/models", {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
+    // validate by calling provider models endpoint
+    const response = await fetch(
+      useOpenRouter ? "https://openrouter.ai/api/v1/models" : "https://ai-gateway.vercel.sh/v1/models",
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      }
+    );
 
     if (response.status === 401) {
       return NextResponse.json(
-        { valid: false, error: "Invalid API key. Please check your OpenRouter API key." },
+        {
+          valid: false,
+          error: useOpenRouter
+            ? "Invalid API key. Please check your OpenRouter key."
+            : "Invalid API key. Please check your Vercel AI Gateway key.",
+        },
         { status: 401 }
       );
     }
 
     if (response.status === 403) {
       return NextResponse.json(
-        { valid: false, error: "API key does not have permission. Check your OpenRouter account." },
+        {
+          valid: false,
+          error: useOpenRouter
+            ? "API key does not have permission. Check your OpenRouter account."
+            : "API key does not have permission. Check your Vercel AI Gateway settings.",
+        },
         { status: 403 }
       );
     }
 
     if (!response.ok) {
       return NextResponse.json(
-        { valid: false, error: `OpenRouter error: ${response.status}` },
+        { valid: false, error: `Gateway error: ${response.status}` },
         { status: response.status }
       );
     }

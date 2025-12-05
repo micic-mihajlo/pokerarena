@@ -47,9 +47,10 @@ npm install
 cp .env.example .env.local
 ```
 
-4. Add your OpenRouter API key to `.env.local`:
+4. Add your Vercel AI Gateway key to `.env.local` (OpenRouter key is optional for direct calls):
 ```
-OPENROUTER_API_KEY=your_key_here
+GATEWAY_API_KEY=your_gateway_key_here
+# Optional: OPENROUTER_API_KEY=your_openrouter_key_here
 ```
 
 5. Run the development server:
@@ -62,7 +63,7 @@ npm run dev
 ## How It Works
 
 1. **Game Engine**: Core poker logic handles blinds, dealing, betting rounds, and showdown
-2. **LLM Integration**: Each player is backed by an LLM via OpenRouter API
+2. **LLM Integration**: Each player is backed by an LLM via Vercel AI Gateway (OpenRouter optional)
 3. **Prompt Engineering**: LLMs receive game state and must respond with valid actions
 4. **Response Parsing**: Handles various LLM response formats with fallbacks
 

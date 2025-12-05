@@ -152,7 +152,7 @@ export function PlayerSeat({
 
       {/* Main Player HUD Box */}
       <div className={cn(
-        "relative min-w-[120px] rounded-lg overflow-hidden",
+        "relative min-w-[140px] rounded-lg overflow-hidden",
         "bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95",
         "backdrop-blur-md border-2",
         isActive && "border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]",
@@ -180,12 +180,12 @@ export function PlayerSeat({
         {/* Player name bar */}
         <div className="relative px-3 py-1.5 bg-slate-800/60 border-b border-slate-700/40">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-white font-semibold text-sm truncate max-w-[80px]">
+            <span className="text-white font-semibold text-xs whitespace-nowrap">
               {player.name}
             </span>
             {/* Dealer button */}
             {player.isDealer && (
-              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-white to-slate-200 text-slate-900 text-[9px] font-black flex items-center justify-center shadow-md">
+              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-white to-slate-200 text-slate-900 text-[9px] font-black flex items-center justify-center shadow-md shrink-0">
                 D
               </div>
             )}
@@ -245,13 +245,13 @@ export function PlayerSeat({
         </div>
       )}
 
-      {/* Bet chip */}
-      {player.currentBet > 0 && (
+      {/* Bet chip - shows total invested this hand */}
+      {player.totalBetThisHand > 0 && (
         <div
           className="absolute"
           style={styles.chip}
         >
-          <ChipStack amount={player.currentBet} size="sm" />
+          <ChipStack amount={player.totalBetThisHand} size="sm" />
         </div>
       )}
     </motion.div>

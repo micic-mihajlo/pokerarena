@@ -150,6 +150,7 @@ export function applyAction(
       logAmount = callAmount;
       player.chips -= callAmount;
       player.currentBet += callAmount;
+      player.totalBetThisHand += callAmount;
       newState.pots[0].amount += callAmount;
 
       if (player.chips === 0) {
@@ -163,6 +164,7 @@ export function applyAction(
       logAmount = betAmount;
       player.chips -= betAmount;
       player.currentBet += betAmount;
+      player.totalBetThisHand += betAmount;
       newState.bettingRound.currentBet = player.currentBet;
       newState.bettingRound.raisesThisRound = 1;
       newState.bettingRound.lastRaiser = playerId;
@@ -180,6 +182,7 @@ export function applyAction(
       logAmount = totalAmount;
       player.chips -= totalAmount;
       player.currentBet += totalAmount;
+      player.totalBetThisHand += totalAmount;
       newState.bettingRound.currentBet = player.currentBet;
       newState.bettingRound.raisesThisRound++;
       newState.bettingRound.lastRaiser = playerId;
@@ -213,20 +216,39 @@ export function isBettingRoundComplete(state: GameState): boolean {
     (p) => p.status === "active" || p.status === "all_in"
   );
 
-  // only one player left = everyone else folded
-  if (activePlayers.filter((p) => p.status === "active").length <= 1) {
+  // only one non-folded player left = everyone else folded
+  if (activePlayers.length <= 1) {
     return true;
   }
 
-  // all active players have acted and bets are matched
+  // all active (non-all-in) players have acted and bets are matched
   const activeNotAllIn = activePlayers.filter((p) => p.status === "active");
 
+  // if no active players left (all are all-in or folded), round is complete
+  if (activeNotAllIn.length === 0) {
+    return true;
+  }
+
+  // if only one active player and all others are all-in, check if they've acted
+  if (activeNotAllIn.length === 1) {
+    const player = activeNotAllIn[0];
+    // they need to have acted AND matched the bet (or be facing no bet)
+    if (state.bettingRound.actedPlayers.has(player.id)) {
+      // if their bet matches or exceeds, round is done
+      if (player.currentBet >= state.bettingRound.currentBet) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // normal case: all active players must have acted and matched bets
   for (const player of activeNotAllIn) {
     // hasn't acted yet
     if (!state.bettingRound.actedPlayers.has(player.id)) {
       return false;
     }
-    // bet not matched
+    // bet not matched (unless they're the one who set it)
     if (player.currentBet < state.bettingRound.currentBet) {
       return false;
     }

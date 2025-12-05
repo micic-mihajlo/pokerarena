@@ -227,7 +227,7 @@ export function WelcomeScreen() {
 
             <h2 className="text-white font-semibold text-xl mb-2 text-center">Enter the Arena</h2>
             <p className="text-slate-400 text-sm mb-8 text-center">
-              Bring your OpenRouter API key to watch LLMs compete.
+              Bring your Vercel AI Gateway key to watch LLMs compete (OpenRouter keys still work).
               <br />
               <span className="text-slate-500">Your key stays in your browser.</span>
             </p>
@@ -236,13 +236,13 @@ export function WelcomeScreen() {
               <div className="space-y-2">
                 <label htmlFor="api-key" className="text-sm text-slate-300 flex items-center gap-2">
                   <span className="text-emerald-400">♦</span>
-                  OpenRouter API Key
+                  Vercel AI Gateway Key
                 </label>
                 <div className="relative">
                   <Input
                     id="api-key"
                     type={showKey ? "text" : "password"}
-                    placeholder="sk-or-..."
+                    placeholder="your-gateway-key or sk-or-..."
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value)}
                     className="bg-black/40 border-emerald-900/50 text-white placeholder:text-slate-600 pr-10 h-12 focus:border-emerald-500 focus:ring-emerald-500/20"
@@ -293,12 +293,12 @@ export function WelcomeScreen() {
               <p className="text-slate-500 text-sm text-center">
                 Need an API key?{" "}
                 <a
-                  href="https://openrouter.ai/keys"
+                  href="https://vercel.com/ai-gateway"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 font-medium"
                 >
-                  Get one from OpenRouter
+                  Get one from Vercel AI Gateway
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </p>

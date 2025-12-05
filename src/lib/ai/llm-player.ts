@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { openrouter, createOpenRouterClient } from "@/lib/openrouter";
+import { aiGateway, createGatewayClient, openrouter, createOpenRouterClient } from "@/lib/openrouter";
 import { GameState, Player, ActionType, ValidActions } from "@/types/poker";
 import { getValidActions } from "@/lib/poker/engine";
 import { POKER_SYSTEM_PROMPT, POKER_SYSTEM_PROMPT_WITH_REASONING, formatGameStatePrompt } from "./prompts";
@@ -121,7 +121,8 @@ function extractNativeReasoning(reasoning: unknown): string | undefined {
 export async function getLLMAction(
   state: GameState,
   player: Player,
-  apiKey?: string
+  apiKey?: string,
+  provider?: "gateway" | "openrouter"
 ): Promise<LLMActionResult> {
   const validActions = getValidActions(state);
   let prompt = formatGameStatePrompt(state, player, validActions);
@@ -140,8 +141,11 @@ export async function getLLMAction(
     ? POKER_SYSTEM_PROMPT_WITH_REASONING
     : POKER_SYSTEM_PROMPT;
 
-  // use custom API key if provided, otherwise fall back to default
-  const modelFn = apiKey ? createOpenRouterClient(apiKey) : openrouter;
+  // choose provider: default gateway, allow explicit openrouter
+  const preferOpenRouter = provider === "openrouter" || (apiKey && apiKey.startsWith("sk-or-"));
+  const modelFn = preferOpenRouter
+    ? createOpenRouterClient(apiKey || process.env.OPENROUTER_API_KEY || "")
+    : (apiKey ? createGatewayClient(apiKey) : aiGateway);
 
   try {
     const result = await generateText({
@@ -154,18 +158,11 @@ export async function getLLMAction(
 
     const { text, reasoning } = result;
 
-    // DEBUG: log what we're getting from the model
-    console.log(`[${player.model}] text:`, JSON.stringify(text));
-    console.log(`[${player.model}] reasoning:`, JSON.stringify(reasoning));
-
     // parse action and inline reasoning from text
     const parsed = parseResponse(text, validActions);
 
     // check for SDK reasoning field (OpenAI reasoning models)
     const nativeReasoning = extractNativeReasoning(reasoning);
-
-    console.log(`[${player.model}] parsed.reasoning:`, parsed.reasoning?.substring(0, 100));
-    console.log(`[${player.model}] nativeReasoning:`, nativeReasoning?.substring(0, 100));
 
     // prefer: native reasoning > inline reasoning from text
     const finalReasoning = nativeReasoning || parsed.reasoning;
