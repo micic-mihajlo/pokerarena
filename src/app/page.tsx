@@ -47,7 +47,7 @@ export default function Home() {
     setError,
   } = useGameStore();
 
-  const { apiKey, isValidated, loadFromStorage } = useApiKeyStore();
+  const { apiKey, isValidated, useEnvKey, loadFromStorage, setUseEnvKey } = useApiKeyStore();
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingRef = useRef(false);
@@ -57,18 +57,31 @@ export default function Home() {
   const lastHandNumberRef = useRef<number>(0);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // load API key from storage on mount
+  // check for env key and load from storage on mount
   useEffect(() => {
-    loadFromStorage();
-    setIsHydrated(true);
-  }, [loadFromStorage]);
+    const checkEnvKey = async () => {
+      try {
+        const res = await fetch("/api/check-env-key");
+        const data = await res.json();
+        if (data.hasEnvKey) {
+          setUseEnvKey(true);
+        } else {
+          loadFromStorage();
+        }
+      } catch {
+        loadFromStorage();
+      }
+      setIsHydrated(true);
+    };
+    checkEnvKey();
+  }, [loadFromStorage, setUseEnvKey]);
 
-  // initialize game on mount (only when we have API key)
+  // initialize game on mount (only when we have API key or env key)
   useEffect(() => {
-    if (apiKey && isValidated) {
+    if ((apiKey && isValidated) || useEnvKey) {
       initGame();
     }
-  }, [initGame, apiKey, isValidated]);
+  }, [initGame, apiKey, isValidated, useEnvKey]);
 
   // clear reasoning history when hand number changes
   useEffect(() => {
@@ -229,8 +242,8 @@ export default function Home() {
     );
   }
 
-  // show welcome screen if no API key
-  if (!apiKey || !isValidated) {
+  // show welcome screen if no API key and not using env key
+  if (!useEnvKey && (!apiKey || !isValidated)) {
     return <WelcomeScreen />;
   }
 

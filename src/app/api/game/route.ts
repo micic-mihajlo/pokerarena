@@ -22,7 +22,10 @@ interface ActionResponse {
 export async function POST(request: NextRequest): Promise<NextResponse<ActionResponse | { error: string }>> {
   try {
     const body = (await request.json()) as ActionRequest;
-    const { gameState, apiKey } = body;
+    const { gameState, apiKey: userApiKey } = body;
+
+    // use user-provided key or fall back to env key
+    const apiKey = userApiKey || process.env.OPENROUTER_API_KEY;
 
     if (!gameState) {
       return NextResponse.json({ error: "Missing game state" }, { status: 400 });

@@ -28,7 +28,7 @@ type ViewState = "main" | "add-player" | { type: "edit-player"; playerId: string
 
 export function SettingsDialog({ disabled }: { disabled?: boolean }) {
   const { config, setConfig, initGame, isRunning } = useGameStore();
-  const { apiKey, clearApiKey } = useApiKeyStore();
+  const { apiKey, useEnvKey, clearApiKey } = useApiKeyStore();
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -61,12 +61,14 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
   }, [open, models.length]);
 
   const fetchModels = async () => {
-    if (!apiKey) return;
+    if (!apiKey && !useEnvKey) return;
     setLoadingModels(true);
     try {
-      const res = await fetch("/api/models", {
-        headers: { "x-api-key": apiKey },
-      });
+      const headers: Record<string, string> = {};
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+      }
+      const res = await fetch("/api/models", { headers });
       const data = await res.json();
       if (data.models) setModels(data.models);
     } catch (e) {
@@ -328,27 +330,29 @@ export function SettingsDialog({ disabled }: { disabled?: boolean }) {
             </div>
           </section>
 
-          {/* API Key */}
-          <section className="pt-4 border-t border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
-                  API Key
+          {/* API Key - only show if user provided their own key */}
+          {apiKey && !useEnvKey && (
+            <section className="pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
+                    API Key
+                  </div>
+                  <div className="text-sm font-mono text-slate-300">{maskedApiKey}</div>
                 </div>
-                <div className="text-sm font-mono text-slate-300">{maskedApiKey}</div>
+                <button
+                  onClick={() => {
+                    clearApiKey();
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign out
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  clearApiKey();
-                  setOpen(false);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Sign out
-              </button>
-            </div>
-          </section>
+            </section>
+          )}
         </div>
       </ScrollArea>
 

@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import { openrouter, createOpenRouterClient } from "@/lib/openrouter";
 import { GameState, Player, ActionType, ValidActions } from "@/types/poker";
 import { getValidActions } from "@/lib/poker/engine";
-import { POKER_SYSTEM_PROMPT, formatGameStatePrompt } from "./prompts";
+import { POKER_SYSTEM_PROMPT, POKER_SYSTEM_PROMPT_WITH_REASONING, formatGameStatePrompt } from "./prompts";
 
 export interface LLMActionResult {
   action: ActionType;
@@ -63,11 +63,26 @@ function parseResponse(text: string, validActions: ValidActions): { action: Acti
   return { action, reasoning };
 }
 
+// check if reasoning is redacted/useless (OpenAI sometimes returns [REDACTED])
+function isRedactedReasoning(text: string): boolean {
+  if (!text || text.length < 20) return true;
+  const lower = text.toLowerCase();
+  // check for redaction patterns
+  if (lower.includes("[redacted]") || lower.includes("[image #")) return true;
+  // check if it's mostly redacted (more than 50% is redaction markers)
+  const redactionPattern = /\[(?:redacted|image #\d+)\]/gi;
+  const matches = text.match(redactionPattern);
+  if (matches && matches.join("").length > text.length * 0.3) return true;
+  return false;
+}
+
 // extract native reasoning from SDK reasoning field
 function extractNativeReasoning(reasoning: unknown): string | undefined {
   if (!reasoning) return undefined;
-  if (typeof reasoning === "string") return reasoning;
-  
+  if (typeof reasoning === "string") {
+    return isRedactedReasoning(reasoning) ? undefined : reasoning;
+  }
+
   // handle array format: [{type:"reasoning", text:"..."}]
   if (Array.isArray(reasoning)) {
     const texts = reasoning
@@ -78,18 +93,24 @@ function extractNativeReasoning(reasoning: unknown): string | undefined {
         return "";
       })
       .filter(Boolean);
-    return texts.length > 0 ? texts.join("\n") : undefined;
+    const joined = texts.length > 0 ? texts.join("\n") : undefined;
+    return joined && isRedactedReasoning(joined) ? undefined : joined;
   }
-  
+
   // handle object format
   if (typeof reasoning === "object" && reasoning !== null) {
     const r = reasoning as Record<string, unknown>;
-    if ("text" in r && typeof r.text === "string") return r.text;
+    if ("text" in r && typeof r.text === "string") {
+      return isRedactedReasoning(r.text) ? undefined : r.text;
+    }
     if ("summary" in r) {
       const summary = r.summary;
-      if (typeof summary === "string") return summary;
+      if (typeof summary === "string") {
+        return isRedactedReasoning(summary) ? undefined : summary;
+      }
       if (Array.isArray(summary)) {
-        return summary.map((s) => (typeof s === "string" ? s : s?.text || "")).filter(Boolean).join(" ");
+        const joined = summary.map((s) => (typeof s === "string" ? s : s?.text || "")).filter(Boolean).join(" ");
+        return isRedactedReasoning(joined) ? undefined : joined;
       }
     }
   }
@@ -105,10 +126,19 @@ export async function getLLMAction(
   const validActions = getValidActions(state);
   let prompt = formatGameStatePrompt(state, player, validActions);
 
-  // gemini doesn't respect include_reasoning, so ask explicitly
-  if (player.model.includes("gemini")) {
-    prompt += "\n\nFirst briefly explain your reasoning, then give your action as JSON.";
-  }
+  // some models don't provide accessible reasoning, so we need to use
+  // a different system prompt that forces inline reasoning
+  // gemini: doesn't respect include_reasoning
+  // openai reasoning models (o1, o3, gpt-5): return [REDACTED] encrypted reasoning
+  const needsExplicitReasoning =
+    player.model.includes("gemini") ||
+    player.model.includes("o1-") ||
+    player.model.includes("o3-") ||
+    player.model.includes("gpt-5");
+
+  const systemPrompt = needsExplicitReasoning
+    ? POKER_SYSTEM_PROMPT_WITH_REASONING
+    : POKER_SYSTEM_PROMPT;
 
   // use custom API key if provided, otherwise fall back to default
   const modelFn = apiKey ? createOpenRouterClient(apiKey) : openrouter;
@@ -116,20 +146,27 @@ export async function getLLMAction(
   try {
     const result = await generateText({
       model: modelFn(player.model),
-      system: POKER_SYSTEM_PROMPT,
+      system: systemPrompt,
       prompt,
       maxOutputTokens: 1024,
       temperature: 0.7,
     });
 
     const { text, reasoning } = result;
-    
+
+    // DEBUG: log what we're getting from the model
+    console.log(`[${player.model}] text:`, JSON.stringify(text));
+    console.log(`[${player.model}] reasoning:`, JSON.stringify(reasoning));
+
     // parse action and inline reasoning from text
     const parsed = parseResponse(text, validActions);
-    
+
     // check for SDK reasoning field (OpenAI reasoning models)
     const nativeReasoning = extractNativeReasoning(reasoning);
-    
+
+    console.log(`[${player.model}] parsed.reasoning:`, parsed.reasoning?.substring(0, 100));
+    console.log(`[${player.model}] nativeReasoning:`, nativeReasoning?.substring(0, 100));
+
     // prefer: native reasoning > inline reasoning from text
     const finalReasoning = nativeReasoning || parsed.reasoning;
 

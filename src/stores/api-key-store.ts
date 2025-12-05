@@ -8,6 +8,7 @@ export interface ApiKeyStore {
   isValidated: boolean;
   isValidating: boolean;
   error: string | null;
+  useEnvKey: boolean; // true if using server-side env key
 
   // actions
   setApiKey: (key: string) => void;
@@ -16,6 +17,7 @@ export interface ApiKeyStore {
   setValidated: (validated: boolean) => void;
   setValidating: (validating: boolean) => void;
   setError: (error: string | null) => void;
+  setUseEnvKey: (useEnv: boolean) => void;
 }
 
 export const useApiKeyStore = create<ApiKeyStore>((set) => ({
@@ -23,6 +25,7 @@ export const useApiKeyStore = create<ApiKeyStore>((set) => ({
   isValidated: false,
   isValidating: false,
   error: null,
+  useEnvKey: false,
 
   setApiKey: (key) => {
     // persist to localStorage
@@ -58,5 +61,9 @@ export const useApiKeyStore = create<ApiKeyStore>((set) => ({
 
   setError: (error) => {
     set({ error });
+  },
+
+  setUseEnvKey: (useEnv) => {
+    set({ useEnvKey: useEnv, isValidated: useEnv });
   },
 }));

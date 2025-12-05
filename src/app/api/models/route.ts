@@ -23,9 +23,10 @@ export interface ModelOption {
 
 export async function GET(request: NextRequest) {
   try {
-    // get API key from query params or header
+    // get API key from query params, header, or fall back to env
     const apiKey = request.nextUrl.searchParams.get("apiKey") ||
-      request.headers.get("x-api-key");
+      request.headers.get("x-api-key") ||
+      process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
