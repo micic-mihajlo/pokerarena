@@ -92,12 +92,12 @@ export async function GET(request: NextRequest) {
 
         // Format pricing if available
         let pricing = "Gateway managed";
-        if (model.pricing) {
-          const inputPrice = model.pricing.input
-            ? (model.pricing.input * 1_000_000).toFixed(2)
-            : null;
-          if (inputPrice) {
-            pricing = `$${inputPrice}/1M`;
+        if (model.pricing && model.pricing.input != null) {
+          const inputValue = typeof model.pricing.input === 'string'
+            ? parseFloat(model.pricing.input)
+            : model.pricing.input;
+          if (!isNaN(inputValue)) {
+            pricing = `$${(inputValue * 1_000_000).toFixed(2)}/1M`;
           }
         }
 
