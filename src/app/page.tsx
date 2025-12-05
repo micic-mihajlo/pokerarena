@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { useGameStore } from "@/stores/game-store";
 import { useApiKeyStore } from "@/stores/api-key-store";
 import { PokerTable } from "@/components/poker/poker-table";
+import { MobilePokerTable } from "@/components/poker/mobile-poker-table";
 import { ActionLog } from "@/components/poker/action-log";
 import { SettingsDialog } from "@/components/poker/settings-dialog";
 import { WelcomeScreen } from "@/components/welcome-screen";
@@ -14,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Play, Pause, RotateCcw } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ThinkingEntry {
   id: string;
@@ -56,6 +58,7 @@ export default function Home() {
   const reasoningScrollRef = useRef<HTMLDivElement>(null);
   const lastHandNumberRef = useRef<number>(0);
   const [isHydrated, setIsHydrated] = useState(false);
+  const isMobile = useIsMobile();
 
   // check for env key and load from storage on mount
   useEffect(() => {
@@ -379,142 +382,213 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="relative z-10 flex-1 min-h-0 max-w-[2000px] w-full mx-auto p-2 sm:p-4 lg:p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-14 gap-3 sm:gap-4 lg:gap-6 h-full">
-          {/* Left panel - AI reasoning */}
-          <div className="lg:col-span-4 xl:col-span-3 order-2 lg:order-1 flex flex-col min-h-0 max-h-[300px] lg:max-h-none">
-            <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex flex-col flex-1 min-h-0 shadow-xl">
-              <div className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-white font-semibold text-sm">AI Reasoning</span>
+      {/* Main content - Mobile vs Desktop */}
+      {isMobile ? (
+        /* Mobile Layout */
+        <div className="relative z-10 flex-1 flex flex-col min-h-0">
+          {/* Mobile poker table */}
+          <div className="flex-1 min-h-0">
+            <MobilePokerTable gameState={gameState} className="h-full" />
+          </div>
+
+          {/* Mobile reasoning footer */}
+          <div className="flex-shrink-0 border-t border-slate-800/50 bg-slate-900/95 backdrop-blur-sm">
+            <AnimatePresence mode="wait">
+              {thinkingState?.isThinking ? (
+                <motion.div
+                  key="thinking"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="px-4 py-3 flex items-center gap-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 text-sm font-semibold">{thinkingState.playerName}</span>
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.15 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-slate-500 text-xs">thinking...</span>
+                </motion.div>
+              ) : reasoningHistory.length > 0 ? (
+                <motion.div
+                  key={reasoningHistory[reasoningHistory.length - 1]?.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="px-4 py-3"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-white text-sm font-semibold">
+                      {reasoningHistory[reasoningHistory.length - 1]?.playerName}
+                    </span>
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full",
+                      reasoningHistory[reasoningHistory.length - 1]?.action === "fold" && "bg-slate-700 text-slate-300",
+                      reasoningHistory[reasoningHistory.length - 1]?.action === "check" && "bg-slate-700 text-slate-300",
+                      reasoningHistory[reasoningHistory.length - 1]?.action === "call" && "bg-emerald-600 text-white",
+                      reasoningHistory[reasoningHistory.length - 1]?.action === "bet" && "bg-amber-600 text-white",
+                      reasoningHistory[reasoningHistory.length - 1]?.action === "raise" && "bg-rose-600 text-white"
+                    )}>
+                      {reasoningHistory[reasoningHistory.length - 1]?.action}
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-xs line-clamp-2">
+                    {reasoningHistory[reasoningHistory.length - 1]?.reasoning}
+                  </p>
+                </motion.div>
+              ) : (
+                <div className="px-4 py-3 text-slate-600 text-sm text-center">
+                  Tap Start to begin
                 </div>
-                <span className="text-slate-500 text-xs font-mono">Hand #{gameState.handNumber}</span>
-              </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      ) : (
+        /* Desktop Layout */
+        <div className="relative z-10 flex-1 min-h-0 max-w-[2000px] w-full mx-auto p-2 sm:p-4 lg:p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-14 gap-3 sm:gap-4 lg:gap-6 h-full">
+            {/* Left panel - AI reasoning */}
+            <div className="lg:col-span-4 xl:col-span-3 order-2 lg:order-1 flex flex-col min-h-0 max-h-[300px] lg:max-h-none">
+              <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex flex-col flex-1 min-h-0 shadow-xl">
+                <div className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-white font-semibold text-sm">AI Reasoning</span>
+                  </div>
+                  <span className="text-slate-500 text-xs font-mono">Hand #{gameState.handNumber}</span>
+                </div>
 
-              <ScrollArea className="flex-1 min-h-0" ref={reasoningScrollRef}>
-                <div className="p-3 space-y-2">
-                  {reasoningHistory.map((entry) => (
-                    <motion.div
-                      key={entry.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white text-sm font-semibold">
-                          {entry.playerName}
-                        </span>
-                        <span className={cn(
-                          "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full",
-                          entry.action === "fold" && "bg-slate-700/80 text-slate-300",
-                          entry.action === "check" && "bg-slate-700/80 text-slate-300",
-                          entry.action === "call" && "bg-emerald-600/80 text-emerald-100",
-                          entry.action === "bet" && "bg-amber-600/80 text-amber-100",
-                          entry.action === "raise" && "bg-rose-600/80 text-rose-100"
-                        )}>
-                          {entry.action}
-                        </span>
-                      </div>
-                      <p className="text-slate-400 text-xs leading-relaxed whitespace-pre-wrap">
-                        {entry.reasoning}
-                      </p>
-                    </motion.div>
-                  ))}
-
-                  <AnimatePresence>
-                    {thinkingState?.isThinking && (
+                <ScrollArea className="flex-1 min-h-0" ref={reasoningScrollRef}>
+                  <div className="p-3 space-y-2">
+                    {reasoningHistory.map((entry) => (
                       <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+                        key={entry.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-amber-300 text-sm font-medium">{thinkingState.playerName}</span>
-                          <div className="flex gap-1">
-                            {[0, 1, 2].map((i) => (
-                              <motion.div
-                                key={i}
-                                className="w-1.5 h-1.5 rounded-full bg-amber-400"
-                                animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
-                                transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
-                              />
-                            ))}
-                          </div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-white text-sm font-semibold">
+                            {entry.playerName}
+                          </span>
+                          <span className={cn(
+                            "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full",
+                            entry.action === "fold" && "bg-slate-700/80 text-slate-300",
+                            entry.action === "check" && "bg-slate-700/80 text-slate-300",
+                            entry.action === "call" && "bg-emerald-600/80 text-emerald-100",
+                            entry.action === "bet" && "bg-amber-600/80 text-amber-100",
+                            entry.action === "raise" && "bg-rose-600/80 text-rose-100"
+                          )}>
+                            {entry.action}
+                          </span>
                         </div>
+                        <p className="text-slate-400 text-xs leading-relaxed whitespace-pre-wrap">
+                          {entry.reasoning}
+                        </p>
                       </motion.div>
-                    )}
-                  </AnimatePresence>
+                    ))}
 
-                  {reasoningHistory.length === 0 && !thinkingState?.isThinking && (
-                    <div className="text-center py-8 text-slate-600 text-sm">
-                      Waiting for game to start...
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-          </div>
-
-          {/* Center - Poker table (wider) */}
-          <div className="lg:col-span-8 xl:col-span-8 order-1 lg:order-2 flex flex-col min-h-[400px] lg:min-h-0">
-            <PokerTable gameState={gameState} className="flex-1" />
-          </div>
-
-          {/* Right panel */}
-          <div className="lg:col-span-12 xl:col-span-3 order-3 flex flex-col lg:flex-row xl:flex-col gap-3 sm:gap-4 min-h-0">
-            <ActionLog
-              actions={gameState.actionLog}
-              players={gameState.players}
-              phase={gameState.phase}
-              handNumber={gameState.handNumber}
-              winners={gameState.winners}
-              className="flex-1 min-h-0 lg:flex-1 xl:flex-1 max-h-[250px] lg:max-h-none"
-            />
-
-            {/* Standings */}
-            <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex-shrink-0 lg:flex-1 xl:flex-shrink-0 shadow-xl max-h-[250px] lg:max-h-none">
-              <div className="px-4 py-3 border-b border-slate-800/60 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-500" />
-                <span className="text-white font-semibold text-sm">Standings</span>
-              </div>
-              <div className="p-2">
-                {[...gameState.players]
-                  .sort((a, b) => b.chips - a.chips)
-                  .map((player, i) => (
-                    <div
-                      key={player.id}
-                      className={cn(
-                        "flex items-center justify-between px-3 py-2 rounded-lg transition-colors",
-                        i === 0 && "bg-amber-500/10 border border-amber-500/20"
+                    <AnimatePresence>
+                      {thinkingState?.isThinking && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-300 text-sm font-medium">{thinkingState.playerName}</span>
+                            <div className="flex gap-1">
+                              {[0, 1, 2].map((i) => (
+                                <motion.div
+                                  key={i}
+                                  className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                                  animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                                  transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
                       )}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className={cn(
-                          "w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold",
-                          i === 0 ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black shadow-md" : "bg-slate-700 text-slate-400"
-                        )}>
-                          {i + 1}
-                        </span>
-                        <span className={cn(
-                          "text-sm font-medium",
-                          player.status === "out" ? "text-slate-500 line-through" : "text-white"
-                        )}>
-                          {player.name}
+                    </AnimatePresence>
+
+                    {reasoningHistory.length === 0 && !thinkingState?.isThinking && (
+                      <div className="text-center py-8 text-slate-600 text-sm">
+                        Waiting for game to start...
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+
+            {/* Center - Poker table (wider) */}
+            <div className="lg:col-span-8 xl:col-span-8 order-1 lg:order-2 flex flex-col min-h-[400px] lg:min-h-0">
+              <PokerTable gameState={gameState} className="flex-1" />
+            </div>
+
+            {/* Right panel */}
+            <div className="lg:col-span-12 xl:col-span-3 order-3 flex flex-col lg:flex-row xl:flex-col gap-3 sm:gap-4 min-h-0">
+              <ActionLog
+                actions={gameState.actionLog}
+                players={gameState.players}
+                phase={gameState.phase}
+                handNumber={gameState.handNumber}
+                winners={gameState.winners}
+                className="flex-1 min-h-0 lg:flex-1 xl:flex-1 max-h-[250px] lg:max-h-none"
+              />
+
+              {/* Standings */}
+              <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex-shrink-0 lg:flex-1 xl:flex-shrink-0 shadow-xl max-h-[250px] lg:max-h-none">
+                <div className="px-4 py-3 border-b border-slate-800/60 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-white font-semibold text-sm">Standings</span>
+                </div>
+                <div className="p-2">
+                  {[...gameState.players]
+                    .sort((a, b) => b.chips - a.chips)
+                    .map((player, i) => (
+                      <div
+                        key={player.id}
+                        className={cn(
+                          "flex items-center justify-between px-3 py-2 rounded-lg transition-colors",
+                          i === 0 && "bg-amber-500/10 border border-amber-500/20"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold",
+                            i === 0 ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black shadow-md" : "bg-slate-700 text-slate-400"
+                          )}>
+                            {i + 1}
+                          </span>
+                          <span className={cn(
+                            "text-sm font-medium",
+                            player.status === "out" ? "text-slate-500 line-through" : "text-white"
+                          )}>
+                            {player.name}
+                          </span>
+                        </div>
+                        <span className="text-emerald-400 font-mono text-sm font-bold">
+                          {player.chips.toLocaleString()}
                         </span>
                       </div>
-                      <span className="text-emerald-400 font-mono text-sm font-bold">
-                        {player.chips.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }
