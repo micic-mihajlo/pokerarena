@@ -25,7 +25,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<ActionRes
     const { gameState, apiKey: userApiKey } = body;
 
     // use user-provided key or fall back to env key
-    const apiKey = userApiKey || process.env.OPENROUTER_API_KEY;
+    const apiKey = userApiKey || process.env.GATEWAY_API_KEY || process.env.OPENROUTER_API_KEY;
+    const provider = apiKey?.startsWith("sk-or-") ? "openrouter" : "gateway";
 
     if (!gameState) {
       return NextResponse.json({ error: "Missing game state" }, { status: 400 });
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ActionRes
     };
 
     // get llm action
-    const result = await getLLMAction(reconstructedState, currentPlayer, apiKey);
+    const result = await getLLMAction(reconstructedState, currentPlayer, apiKey, provider);
 
     // validate and apply action
     const validation = validateAction(reconstructedState, currentPlayer.id, result.action);

@@ -46,6 +46,7 @@ export function createGame(config: Partial<GameConfig> = {}): GameState {
     chips: startingChips,
     holeCards: [],
     currentBet: 0,
+    totalBetThisHand: 0,
     status: "active",
     seatPosition: i,
     isDealer: i === 0,
@@ -89,6 +90,7 @@ export function startHand(state: GameState): GameState {
     ...p,
     holeCards: [],
     currentBet: 0,
+    totalBetThisHand: 0,
     status: p.chips > 0 ? "active" : "out",
     isDealer: i === newState.dealerPosition,
     isTurn: false,
@@ -194,6 +196,7 @@ function postBlinds(state: GameState): GameState {
     const sbAmount = Math.min(newState.smallBlind, sbPlayer.chips);
     sbPlayer.chips -= sbAmount;
     sbPlayer.currentBet = sbAmount;
+    sbPlayer.totalBetThisHand += sbAmount;
     newState.pots[0].amount += sbAmount;
 
     newState.actionLog.push({
@@ -207,6 +210,7 @@ function postBlinds(state: GameState): GameState {
     const bbAmount = Math.min(newState.bigBlind, bbPlayer.chips);
     bbPlayer.chips -= bbAmount;
     bbPlayer.currentBet = bbAmount;
+    bbPlayer.totalBetThisHand += bbAmount;
     newState.pots[0].amount += bbAmount;
 
     newState.actionLog.push({
@@ -228,6 +232,7 @@ function postBlinds(state: GameState): GameState {
   const sbAmount = Math.min(newState.smallBlind, sbPlayer.chips);
   sbPlayer.chips -= sbAmount;
   sbPlayer.currentBet = sbAmount;
+  sbPlayer.totalBetThisHand += sbAmount;
   newState.pots[0].amount += sbAmount;
 
   newState.actionLog.push({
@@ -243,6 +248,7 @@ function postBlinds(state: GameState): GameState {
   const bbAmount = Math.min(newState.bigBlind, bbPlayer.chips);
   bbPlayer.chips -= bbAmount;
   bbPlayer.currentBet = bbAmount;
+  bbPlayer.totalBetThisHand += bbAmount;
   newState.pots[0].amount += bbAmount;
 
   newState.actionLog.push({
@@ -388,6 +394,66 @@ function advancePhase(state: GameState): GameState {
   return newState;
 }
 
+// calculate side pots based on player contributions
+function calculateSidePots(players: Player[]): { amount: number; eligiblePlayers: string[] }[] {
+  const eligiblePlayers = players.filter(
+    (p) => p.status === "active" || p.status === "all_in"
+  );
+
+  if (eligiblePlayers.length === 0) {
+    return [{ amount: 0, eligiblePlayers: [] }];
+  }
+
+  // get unique bet levels sorted ascending
+  const betLevels = [...new Set(eligiblePlayers.map((p) => p.totalBetThisHand))].sort(
+    (a, b) => a - b
+  );
+
+  const pots: { amount: number; eligiblePlayers: string[] }[] = [];
+  let previousLevel = 0;
+
+  for (const level of betLevels) {
+    if (level === 0) continue;
+
+    const increment = level - previousLevel;
+    // players who contributed at least this level are eligible
+    const eligible = eligiblePlayers.filter((p) => p.totalBetThisHand >= level);
+    // each eligible player contributes the increment
+    const potAmount = increment * eligible.length;
+
+    if (potAmount > 0) {
+      pots.push({
+        amount: potAmount,
+        eligiblePlayers: eligible.map((p) => p.id),
+      });
+    }
+
+    previousLevel = level;
+  }
+
+  // add contributions from folded players
+  const foldedPlayers = players.filter((p) => p.status === "folded");
+  for (const folded of foldedPlayers) {
+    if (folded.totalBetThisHand > 0) {
+      // distribute folded player's contribution to appropriate pots
+      let remaining = folded.totalBetThisHand;
+      let prevLevel = 0;
+      for (const pot of pots) {
+        const level = betLevels[pots.indexOf(pot)] || remaining;
+        const contribution = Math.min(remaining, level - prevLevel);
+        if (contribution > 0) {
+          pot.amount += contribution;
+          remaining -= contribution;
+        }
+        prevLevel = level;
+        if (remaining <= 0) break;
+      }
+    }
+  }
+
+  return pots.length > 0 ? pots : [{ amount: 0, eligiblePlayers: [] }];
+}
+
 // end the hand and distribute pot
 function endHand(state: GameState): GameState {
   const newState = { ...state };
@@ -401,7 +467,7 @@ function endHand(state: GameState): GameState {
     (p) => p.status === "active" || p.status === "all_in"
   );
 
-  // if only one player left, they win
+  // if only one player left, they win everything
   if (eligiblePlayers.length === 1) {
     const winner = eligiblePlayers[0];
     const winAmount = newState.pots.reduce((sum, pot) => sum + pot.amount, 0);
@@ -411,7 +477,10 @@ function endHand(state: GameState): GameState {
     return newState;
   }
 
-  // evaluate hands
+  // calculate side pots based on actual contributions
+  const sidePots = calculateSidePots(newState.players);
+
+  // evaluate hands for all eligible players
   const hands: { player: Player; hand: EvaluatedHand }[] = [];
   for (const player of eligiblePlayers) {
     if (player.holeCards.length === 2 && newState.communityCards.length >= 3) {
@@ -420,25 +489,46 @@ function endHand(state: GameState): GameState {
     }
   }
 
-  // determine winners
-  const winnerIndices = determineWinners(hands.map((h) => h.hand));
-  const winners = winnerIndices.map((i) => hands[i]);
+  // distribute each pot to its winners
+  const winnerResults: { playerId: string; amount: number; hand?: EvaluatedHand }[] = [];
 
-  // distribute pot
-  const totalPot = newState.pots.reduce((sum, pot) => sum + pot.amount, 0);
-  const splitAmount = Math.floor(totalPot / winners.length);
-  const remainder = totalPot % winners.length;
+  for (const pot of sidePots) {
+    if (pot.amount === 0) continue;
 
-  newState.winners = winners.map((w, i) => {
-    const amount = splitAmount + (i === 0 ? remainder : 0);
-    w.player.chips += amount;
-    return {
-      playerId: w.player.id,
-      amount,
-      hand: w.hand,
-    };
-  });
+    // filter hands to only those eligible for this pot
+    const eligibleHands = hands.filter((h) =>
+      pot.eligiblePlayers.includes(h.player.id)
+    );
 
+    if (eligibleHands.length === 0) continue;
+
+    // determine winners for this pot
+    const winnerIndices = determineWinners(eligibleHands.map((h) => h.hand));
+    const potWinners = winnerIndices.map((i) => eligibleHands[i]);
+
+    // split the pot
+    const splitAmount = Math.floor(pot.amount / potWinners.length);
+    const remainder = pot.amount % potWinners.length;
+
+    potWinners.forEach((w, i) => {
+      const amount = splitAmount + (i === 0 ? remainder : 0);
+      w.player.chips += amount;
+
+      // add or update winner result
+      const existing = winnerResults.find((r) => r.playerId === w.player.id);
+      if (existing) {
+        existing.amount += amount;
+      } else {
+        winnerResults.push({
+          playerId: w.player.id,
+          amount,
+          hand: w.hand,
+        });
+      }
+    });
+  }
+
+  newState.winners = winnerResults;
   newState.pots = [{ amount: 0, eligiblePlayers: [] }];
 
   return newState;

@@ -1,4 +1,23 @@
+import { createGateway } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+
+// create vercel ai gateway client with custom API key
+export function createGatewayClient(apiKey: string) {
+  const client = createGateway({
+    apiKey,
+  });
+
+  return function aiGateway(modelId: string) {
+    return client(modelId);
+  };
+}
+
+// default gateway client using env variable
+const defaultGatewayClient = createGatewayClient(process.env.GATEWAY_API_KEY || "");
+
+export function aiGateway(modelId: string) {
+  return defaultGatewayClient(modelId);
+}
 
 // create openrouter client with custom API key
 export function createOpenRouterClient(apiKey: string) {

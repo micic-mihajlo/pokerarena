@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-
-export interface OpenRouterModel {
-  id: string;
-  name: string;
-  description?: string;
-  pricing: {
-    prompt: string;
-    completion: string;
-  };
-  context_length: number;
-  supported_parameters?: string[];
-}
+import { createGateway } from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
 export interface ModelOption {
   id: string;
   name: string;
   provider: string;
-  pricing: string; // formatted price per 1M tokens
+  pricing: string;
   contextLength: number;
   popularityRank: number;
 }
@@ -24,8 +14,10 @@ export interface ModelOption {
 export async function GET(request: NextRequest) {
   try {
     // get API key from query params, header, or fall back to env
-    const apiKey = request.nextUrl.searchParams.get("apiKey") ||
+    const apiKey =
+      request.nextUrl.searchParams.get("apiKey") ||
       request.headers.get("x-api-key") ||
+      process.env.GATEWAY_API_KEY ||
       process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
@@ -35,44 +27,92 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/models?supported_parameters=include_reasoning",
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
+    const useOpenRouter = apiKey.startsWith("sk-or-");
+
+    if (useOpenRouter) {
+      // OpenRouter: fetch models from their API
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/models?supported_parameters=include_reasoning",
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter API error: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status}`);
+      const data = await response.json();
+      const models: ModelOption[] = data.data.map(
+        (
+          model: {
+            id: string;
+            name?: string;
+            pricing?: { prompt?: string };
+            context_length?: number;
+          },
+          index: number
+        ) => {
+          const modelId = model.id;
+          const [providerSlug] = modelId.split("/");
+          const provider = providerSlug
+            .split("-")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+          const pricing = model.pricing?.prompt
+            ? `$${(parseFloat(model.pricing.prompt) * 1_000_000).toFixed(2)}/1M`
+            : "Free";
+
+          return {
+            id: modelId,
+            name: model.name || modelId,
+            provider,
+            pricing,
+            contextLength: model.context_length || 128_000,
+            popularityRank: index,
+          };
+        }
+      );
+
+      return NextResponse.json({ models });
+    } else {
+      // Vercel AI Gateway: use SDK method
+      const gateway = createGateway({ apiKey });
+      const availableModels = await gateway.getAvailableModels();
+
+      const models: ModelOption[] = availableModels.models.map((model, index) => {
+        const modelId = model.id;
+        const [providerSlug] = modelId.split("/");
+        const provider = providerSlug
+          .split("-")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+
+        // Format pricing if available
+        let pricing = "Gateway managed";
+        if (model.pricing) {
+          const inputPrice = model.pricing.input
+            ? (model.pricing.input * 1_000_000).toFixed(2)
+            : null;
+          if (inputPrice) {
+            pricing = `$${inputPrice}/1M`;
+          }
+        }
+
+        return {
+          id: modelId,
+          name: model.name || modelId,
+          provider,
+          pricing,
+          contextLength: 128_000, // Gateway doesn't expose this
+          popularityRank: index,
+        };
+      });
+
+      return NextResponse.json({ models });
     }
-
-    const data = await response.json();
-    // openrouter returns models sorted by popularity/usage by default
-    const models: ModelOption[] = data.data.map((model: OpenRouterModel, index: number) => {
-      // extract provider from model id (e.g., "openai/gpt-4" -> "OpenAI")
-      const [providerSlug] = model.id.split("/");
-      const provider = providerSlug
-        .split("-")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-
-      // format pricing (convert from per-token to per-1M tokens)
-      const promptPrice = parseFloat(model.pricing.prompt) * 1_000_000;
-      const pricing = promptPrice > 0 ? `$${promptPrice.toFixed(2)}/1M` : "Free";
-
-      return {
-        id: model.id,
-        name: model.name,
-        provider,
-        pricing,
-        contextLength: model.context_length,
-        popularityRank: index, // preserve original order (by popularity)
-      };
-    });
-
-    return NextResponse.json({ models });
   } catch (error) {
     console.error("Error fetching models:", error);
     return NextResponse.json(

@@ -51,7 +51,7 @@ export type PlayerStatus = "active" | "folded" | "all_in" | "out";
 export interface LLMPlayer {
   id: string;
   name: string;
-  model: string; // openrouter model id
+  model: string; // model id (gateway/openrouter compatible)
   avatar?: string;
 }
 
@@ -59,7 +59,8 @@ export interface LLMPlayer {
 export interface Player extends LLMPlayer {
   chips: number;
   holeCards: Card[];
-  currentBet: number;
+  currentBet: number; // bet in current betting round
+  totalBetThisHand: number; // total invested this hand (across all rounds)
   status: PlayerStatus;
   seatPosition: number;
   isDealer: boolean;

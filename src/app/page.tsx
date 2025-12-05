@@ -98,8 +98,9 @@ export default function Home() {
     }
   }, [reasoningHistory, thinkingState]);
 
-  // fetch action from api
-  const fetchAction = useCallback(async (state: GameState) => {
+  // fetch action from api with retry logic
+  const fetchAction = useCallback(async (state: GameState, retryCount = 0): Promise<{ action: string; reasoning?: string; newState: GameState } | null> => {
+    const MAX_RETRIES = 3;
     const currentPlayer = state.players[state.currentPlayerIndex];
     const currentApiKey = useApiKeyStore.getState().apiKey;
 
@@ -111,6 +112,10 @@ export default function Home() {
     });
 
     try {
+      // add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch("/api/game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,7 +129,10 @@ export default function Home() {
           },
           apiKey: currentApiKey,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -153,7 +161,16 @@ export default function Home() {
       setThinkingState(null);
       return data;
     } catch (error) {
-      console.error("Error fetching action:", error);
+      console.error(`Error fetching action (attempt ${retryCount + 1}):`, error);
+
+      // retry on failure
+      if (retryCount < MAX_RETRIES) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return fetchAction(state, retryCount + 1);
+      }
+
+      // all retries failed
       setError(error instanceof Error ? error.message : "Unknown error");
       setThinkingState(null);
       return null;
@@ -293,18 +310,18 @@ export default function Home() {
             )}
 
             {/* Game stats */}
-            <div className="hidden md:flex items-center gap-4 lg:gap-6 text-sm">
+            <div className="hidden sm:flex items-center gap-3 sm:gap-4 lg:gap-6 text-xs sm:text-sm">
               <div>
                 <span className="text-slate-500">Hand</span>
-                <span className="text-white font-mono ml-2">#{gameState.handNumber}</span>
+                <span className="text-white font-mono ml-1 sm:ml-2">#{gameState.handNumber}</span>
               </div>
-              <div>
+              <div className="hidden md:block">
                 <span className="text-slate-500">Blinds</span>
                 <span className="text-amber-400 font-mono ml-2">
                   {gameState.smallBlind}/{gameState.bigBlind}
                 </span>
               </div>
-              <div>
+              <div className="hidden md:block">
                 <span className="text-slate-500">Players</span>
                 <span className="text-emerald-400 font-mono ml-2">
                   {gameState.players.filter(p => p.status !== "out").length}/{gameState.players.length}
@@ -363,10 +380,10 @@ export default function Home() {
       </header>
 
       {/* Main content */}
-      <div className="relative z-10 flex-1 min-h-0 max-w-[2000px] w-full mx-auto p-4 lg:p-6">
-        <div className="grid grid-cols-1 xl:grid-cols-14 gap-4 lg:gap-6 h-full">
+      <div className="relative z-10 flex-1 min-h-0 max-w-[2000px] w-full mx-auto p-2 sm:p-4 lg:p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-14 gap-3 sm:gap-4 lg:gap-6 h-full">
           {/* Left panel - AI reasoning */}
-          <div className="xl:col-span-3 order-2 xl:order-1 flex flex-col min-h-0">
+          <div className="lg:col-span-4 xl:col-span-3 order-2 lg:order-1 flex flex-col min-h-0 max-h-[300px] lg:max-h-none">
             <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex flex-col flex-1 min-h-0 shadow-xl">
               <div className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -442,23 +459,23 @@ export default function Home() {
           </div>
 
           {/* Center - Poker table (wider) */}
-          <div className="xl:col-span-8 order-1 xl:order-2 flex flex-col min-h-0">
+          <div className="lg:col-span-8 xl:col-span-8 order-1 lg:order-2 flex flex-col min-h-[400px] lg:min-h-0">
             <PokerTable gameState={gameState} className="flex-1" />
           </div>
 
           {/* Right panel */}
-          <div className="xl:col-span-3 order-3 flex flex-col gap-4 min-h-0">
+          <div className="lg:col-span-12 xl:col-span-3 order-3 flex flex-col lg:flex-row xl:flex-col gap-3 sm:gap-4 min-h-0">
             <ActionLog
               actions={gameState.actionLog}
               players={gameState.players}
               phase={gameState.phase}
               handNumber={gameState.handNumber}
               winners={gameState.winners}
-              className="flex-1 min-h-0"
+              className="flex-1 min-h-0 lg:flex-1 xl:flex-1 max-h-[250px] lg:max-h-none"
             />
 
             {/* Standings */}
-            <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex-shrink-0 shadow-xl">
+            <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800/60 overflow-hidden flex-shrink-0 lg:flex-1 xl:flex-shrink-0 shadow-xl max-h-[250px] lg:max-h-none">
               <div className="px-4 py-3 border-b border-slate-800/60 flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-500" />
                 <span className="text-white font-semibold text-sm">Standings</span>
